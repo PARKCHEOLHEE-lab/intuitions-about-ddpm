@@ -2,33 +2,20 @@ import os
 import torch
 import pandas as pd
 
+from typing import List
 from torch.utils.data import Dataset, DataLoader
 
 
 class Datasaurus(Dataset):
-    # https://www.openintro.org/data/csv/datasaurus.csv
-    
-    LABELS = {
-        "bullseye":None,
-        "circle":None,
-        "dino":None,
-        "dots":None,
-        "h_lines":None,
-        "slant_down":None,
-        "slant_up":None,
-        "star":None,
-        "v_lines": None,
-        "x_shape": None,
-    }
-    
-    for li, label in enumerate(LABELS.keys()):
-        LABELS[label] = li
-    
+    """Dataset from https://www.openintro.org/data/csv/datasaurus.csv
+    """
+        
     def __init__(
         self, 
         path: str, 
         num_points: int = 1000, 
-        device: str = "cuda"
+        device: str = "cuda",
+        labels_to_use: List[str] = None,
     ) -> None:
     
         super().__init__()
@@ -39,13 +26,33 @@ class Datasaurus(Dataset):
         self.path = path
         self.num_points = num_points
         self.device = device
+        self.labels_to_use = labels_to_use
+        
+        self.labels = {
+            "bullseye":None,
+            "circle":None,
+            "dino":None,
+            "dots":None,
+            "h_lines":None,
+            "slant_down":None,
+            "slant_up":None,
+            "star":None,
+            "v_lines": None,
+            "x_shape": None,
+        }
+        
+        if self.labels_to_use is not None:
+            self.labels = {label: self.labels[label] for label in self.labels_to_use}
+            
+        for li, label in enumerate(self.labels.keys()):
+            self.labels[label] = li
         
         self._dataframe = pd.read_csv(self.path)
         self.dataframe = self._dataframe.copy()
-        self.dataframe = self.dataframe[self.dataframe["dataset"].isin(self.LABELS.keys())]
+        self.dataframe = self.dataframe[self.dataframe["dataset"].isin(self.labels.keys())]
         
         # convert text label into integer label
-        self.dataframe["label"] = [self.LABELS[label] for label in self.dataframe["dataset"].tolist()]
+        self.dataframe["label"] = [self.labels[label] for label in self.dataframe["dataset"].tolist()]
         
         # (x, y, label)
         templates = torch.vstack(
@@ -63,7 +70,7 @@ class Datasaurus(Dataset):
         jitter_y_std = templates[:, 1].var() * 0.25
         
         xylabels = []
-        for label in self.LABELS.values():
+        for label in self.labels.values():
             jitter_x = torch.normal(mean=0, std=jitter_x_std, size=(self.num_points, 1))
             jitter_y = torch.normal(mean=0, std=jitter_y_std, size=(self.num_points, 1))
             jitter = torch.hstack([jitter_x, jitter_y])
@@ -77,7 +84,7 @@ class Datasaurus(Dataset):
         # shape: (len(LABELS) * num_points, 3)
         self.xylabels = torch.vstack(xylabels)
         
-        assert self.xylabels.shape == (len(self.LABELS) * num_points, 3)
+        assert self.xylabels.shape == (len(self.labels) * num_points, 3)
         
     def __len__(self) -> int:
         return self.xylabels.shape[0]

@@ -10,24 +10,34 @@ class SinusoidalEncoder(nn.Module):
 
         self.embedding_dim = embedding_dim
         
-    def forward(self, coordinate: torch.Tensor) -> torch.Tensor:
-        # a^b = e^{b log(a)}
-        # 10000^{-2i/d} = exp(-2i/d log(10000))
-        # d = 2*half, 10000^{-2i/(2*half)} = 10000^{-i/half} 
+    def forward(self, tensor_to_encode: torch.Tensor) -> torch.Tensor:
+        """do sinusoidal encoding for a tensor.
+
+        Note:
+            a^b = e^{b log(a)}
+            10000^{-2i/d} = exp(-2i/d log(10000))
+            d = 2*half, 10000^{-2i/(2*half)} = 10000^{-i/half} 
+
+        Args:
+            tensor_to_encode (torch.Tensor): _description_
+
+        Returns:
+            torch.Tensor: embedding
+        """
         
         half = self.embedding_dim // 2
         
         i = torch.arange(half)
         f = torch.log(torch.tensor(10000)) / (half - 1)
-        w = torch.exp(-f * i).unsqueeze(0).to(coordinate.device)
+        w = torch.exp(-f * i).unsqueeze(0).to(tensor_to_encode.device)
 
-        embedding = coordinate @ w
+        embedding = tensor_to_encode @ w
         embedding = torch.cat((torch.sin(embedding), torch.cos(embedding)), dim=-1)
 
         return embedding
 
         
-class NoiseScheduler:
+class BetaScheduler:
     def __init__(self, configs: dict):
         self.configs = configs
         
@@ -49,20 +59,20 @@ class NoiseScheduler:
 
         self.one_minus_alphas_bar = 1 - self.alphas_bar
         self.one_minus_alphas_bar_sqrt = torch.sqrt(self.one_minus_alphas_bar)
-    
-    def q_sample(self, x0, t):
-        return (
-            self.alphas_bar_sqrt[t] * x0
-            + self.one_minus_alphas_bar_sqrt[t] * torch.randn_like(x0)
-            )
+        
+        # set device
+        for k, v in self.__dict__.items():
+            if isinstance(v, torch.Tensor):
+                self.__dict__[k] = v.to(self.configs["device"])
 
 
 class DDPM(nn.Module):
-    def __init__(self, configs: dict, labels: dict[str, int]):
+    def __init__(self, configs: dict, labels: dict[str, int], beta_scheduler: BetaScheduler):
         super().__init__()
         
         self.configs = configs
         self.labels = labels
+        self.beta_scheduler = beta_scheduler
         
         # set label embeddings
         self.label_embeddings = nn.Embedding(len(self.labels), self.configs["label_embedding_dim"])
@@ -87,7 +97,7 @@ class DDPM(nn.Module):
         
         # set denoiser
         self.denoiser_input_dim = (
-            self.configs["coordinate_embedding_dim"] 
+            self.configs["coordinate_embedding_dim"] * 2
             + self.configs["time_embedding_dim"] 
             + self.configs["label_embedding_dim"]
         )
@@ -112,16 +122,70 @@ class DDPM(nn.Module):
         self.denoiser = nn.Sequential(*denoiser_layers)
 
         self.to(self.configs["device"])
+    
+    def q(self, x_0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
+        """do forward diffusion process.
         
-    def p(self):
-        return
+        Note: 
+            x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon
+
+        Args:
+            x_0 (torch.Tensor): x_0
+            t (torch.Tensor): time steps
+            noise (torch.Tensor): noise sampled from N(0, 1)
+
+        Returns:
+            torch.Tensor: x_t
+        """
         
-    def forward(self, coordinates: torch.Tensor, t: torch.Tensor, label_embeddings: torch.Tensor):
+        return (
+            self.beta_scheduler.alphas_bar_sqrt[t] * x_0
+            + self.beta_scheduler.one_minus_alphas_bar_sqrt[t] * noise
+        )
+        
+    def p(self, x_t: torch.Tensor, t: torch.Tensor, noise: torch.Tensor) -> torch.Tensor:
+        """do reverse diffusion process.
+        
+        Note: 
+            x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * epsilon
+            x_t - sqrt(1 - alpha_bar_t) * epsilon = sqrt(alpha_bar_t) * x_0
+            1 / sqrt(alpha_bar_t) * (x_t - sqrt(1 - alpha_bar_t) * epsilon) = x_0
+            
+        Args:
+            x_t (torch.Tensor): x_t
+            t (torch.Tensor): time steps
+            noise (torch.Tensor): noise sampled from N(0, 1)
+
+        Returns:
+            torch.Tensor: x_{t-1}
+        """
+        
+        return (
+            1 / self.beta_scheduler.alphas_bar_sqrt[t] 
+            * (x_t - self.beta_scheduler.one_minus_alphas_bar_sqrt[t] * noise)
+        )
+        
+    def forward(
+        self, 
+        coordinates: torch.Tensor, 
+        t: torch.Tensor, 
+        label_embeddings: torch.Tensor
+    ) -> torch.Tensor:
 
         time_encoded = self.time_encoder(t)
         coordinate_x_encoded = self.coordinate_encoder_x(coordinates[:, [0]])
         coordinate_y_encoded = self.coordinate_encoder_y(coordinates[:, [1]])
-
-        torch.cat()
         
-        return
+        denoiser_input = torch.cat(
+            [
+                time_encoded,
+                coordinate_x_encoded,
+                coordinate_y_encoded,
+                label_embeddings,
+            ],
+            dim=-1
+        )
+        
+        noise_predicted = self.denoiser(denoiser_input)
+
+        return noise_predicted
