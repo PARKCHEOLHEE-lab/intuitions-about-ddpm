@@ -46,8 +46,8 @@ class Trainer:
                 x_t = self.ddpm.q(x_0=coordinates, t=t, noise=noise)
                 
                 noise_predicted = self.ddpm(
-                    coordinates=coordinates, 
-                    t=t.float(), 
+                    coordinates=x_t,
+                    t=t.float(),
                     label_embeddings=self.ddpm.label_embeddings(labels),
                 )
                 

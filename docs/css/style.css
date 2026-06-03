@@ -1,0 +1,142 @@
+/* Styled to match PARKCHEOLHEE-lab.github.io's design system (see that repo's
+   DESIGN.md): PT Sans, flat surfaces (border + tint, no shadows/gradients),
+   em-based spacing, fluid type. Plot/data colors stay semantic. */
+
+/* Self-hosted PT Sans (vendored, no CDN) so the page stays fully offline. */
+@font-face {
+  font-family: "PT Sans";
+  src: local("PT Sans"), local("PTSans-Regular"), url("../fonts/PTSans-Regular.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PT Sans";
+  src: local("PT Sans Bold"), local("PTSans-Bold"), url("../fonts/PTSans-Bold.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* design tokens mirrored from _sass/index.sass */
+  --font: "PT Sans", -apple-system, "Helvetica Neue", "Segoe UI", "Roboto", sans-serif;
+  --dark: #000000;
+  --light: #ffffff;
+  --text-dark: rgb(70, 70, 70);
+  --link: #66a1ff;
+  --featured: #0011e3;
+  --bg-subtle: #f7f7f8;
+  --text-chat: #343541;
+  --divider: #e5e5e6;
+  --reduce-14: rgba(128, 128, 128, 0.14);
+  --reduce-30: rgba(128, 128, 128, 0.30);
+  --reduce-90: rgba(128, 128, 128, 0.90);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--light);
+  color: var(--dark);
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: calc(0.7rem + 0.2vw);
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 1.5em clamp(1.5em, 20vw - 6em, 40vw - 17em);
+}
+
+/* The site keeps backgrounds flat even in dark mode. */
+@media (prefers-color-scheme: dark) {
+  body { background: var(--light); color: var(--dark); }
+}
+
+header h1 { font-size: 1.7em; font-weight: 600; margin: 0 0 0.1em; }
+.subtitle { margin: 0 0 1.5em; color: var(--text-dark); }
+
+h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+
+main { margin-top: 1.5em; }
+
+/* Each concept is one section; figures may exceed the prose column. */
+section { margin: 0 0 3em; }
+section h2 { font-size: 1.3em; margin: 0 0 0.5em; }
+/* No per-element width caps: prose, callouts, controls and figures all share the
+   single page column (set by the body padding) so their left AND right edges line
+   up. A narrower cap here made the text ragged against the full-width figures. */
+section > p { margin: 0.6em 0; text-align: justify; }
+section > ul { padding-left: 1.2em; }
+section > ul li { margin: 0.3em 0; }
+
+b, strong, th { font-weight: 600; color: var(--text-dark); }
+
+a { color: var(--link); text-decoration: inherit; }
+a:hover { text-decoration: underline; }
+
+/* Display equations: room to breathe, scroll if too wide on mobile. */
+p.eq { margin: 0.9em 0; overflow-x: auto; overflow-y: hidden; }
+.katex { font-size: 1.05em; }
+.katex-display { margin: 0.4em 0; }
+
+/* Plain-language callout tying the math to the interactive panel — a flat
+   blockquote-style surface (subtle bg + hairline left rule, no shadow). */
+.explain {
+  margin: 0.9em 0 0;
+  padding: 0.7em 1em;
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--reduce-90);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-chat, #343541);
+}
+.hint { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin: 0.3em 0 0; }
+.legend { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin: 0.4em 0 0; display: flex; align-items: center; flex-wrap: wrap; }
+.legend .sw { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 2px; margin: 0 1px; }
+
+.controls { display: flex; gap: 1em; align-items: center; flex-wrap: wrap; margin: 0.5em 0; }
+.toggle { display: inline-flex; align-items: center; gap: 0.3em; }
+
+/* Play button: flat, bordered, tints on hover; green ring while playing. */
+.play {
+  cursor: pointer; border: 1px solid var(--reduce-30); background: transparent; color: inherit;
+  border-radius: 4px; width: 1.9em; height: 1.9em; line-height: 1; font-size: 0.85em; padding: 0;
+}
+.play:hover:not(:disabled) { background: var(--reduce-14); }
+.play:disabled { opacity: 0.4; cursor: default; }
+.play[data-playing="true"] { border-color: #16a34a; color: #16a34a; }
+
+/* Side-by-side canvas figures; each flexes so 2–3 panels share one row and
+   shrink to fit instead of overflowing, wrapping only on narrow screens. */
+.two-panel { display: flex; gap: 1.25em; flex-wrap: wrap; align-items: flex-start; }
+.two-panel figure { margin: 0; flex: 1 1 200px; min-width: 0; }
+.two-panel figcaption { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin-bottom: 0.25em; }
+/* Single canvases keep their intrinsic size (shrinking on small screens);
+   only side-by-side figures stretch to fill their flex share. */
+canvas { max-width: 100%; height: auto; }
+.two-panel canvas { width: 100%; }
+
+.kv { list-style: none; padding: 0; display: flex; gap: 1.25em; flex-wrap: wrap; }
+.kv code, code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }
+
+hr { border: none; border-top: 1px solid var(--divider); margin: 2em 0; }
+
+/* Error surface: populated only when a data fetch fails (no silent fallback). */
+#error {
+  margin-top: 1em;
+  padding: 0.75em 1em;
+  background: var(--bg-subtle);
+  border: 1px solid var(--reduce-30);
+  border-left: 3px solid #b91c1c;
+  border-radius: 0 4px 4px 0;
+  color: #b91c1c;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: calc(0.6rem + 0.2vw);
+}
+
+.shape-bar { gap: 0.75em; margin: 1.5em 0; }
+.shape-bar select { font-family: var(--font); font-size: 1em; padding: 0.15em 0.4em; }
