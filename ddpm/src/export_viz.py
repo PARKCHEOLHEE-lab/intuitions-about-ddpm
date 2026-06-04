@@ -84,29 +84,6 @@ def chamfer_distance(data, gen) -> float:
     return float(precision + recall)
 
 
-def _ascii_scatter(data, gen, width: int = 54, height: int = 18) -> str:
-    """Render ``gen`` points as a text scatter fit to the bbox of ``data``."""
-
-    import numpy as np
-
-    data = np.asarray(data, dtype=float)
-    gen = np.asarray(gen, dtype=float)
-    lo = data.min(axis=0)
-    hi = data.max(axis=0)
-    span = hi - lo
-    span[span == 0] = 1.0
-
-    grid = [[" "] * width for _ in range(height)]
-    for px, py in gen:
-        cx = int(np.clip((px - lo[0]) / span[0] * (width - 1), 0, width - 1))
-        # flip y so larger y is higher on screen
-        cy = int(np.clip((py - lo[1]) / span[1] * (height - 1), 0, height - 1))
-        grid[height - 1 - cy][cx] = "#"
-    border = "+" + "-" * width + "+"
-    rows = ["|" + "".join(r) + "|" for r in grid]
-    return "\n".join([border] + rows + [border])
-
-
 def _seed_everything(seed: int) -> None:
     import random
 

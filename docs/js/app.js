@@ -23,6 +23,24 @@ async function fetchJSON(path) {
   return res.json();
 }
 
+// Play/pause icons as inline SVG. The shapes are geometrically centered in the
+// 24×24 viewBox (triangle bbox x:[8,16] y:[6,18] → center 12,12; the two pause
+// bars are symmetric about 12), so the rendered ink centers exactly in the
+// button — a Unicode ▶/⏸ glyph cannot, since its ink sits off-center in the cell.
+const ICON_PLAY = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="8,6 8,18 16,12" /></svg>';
+const ICON_PAUSE = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" /><rect x="13.5" y="6" width="3.5" height="12" /></svg>';
+
+// Paint a range slider's track as a "progress fill": the accent color up to the
+// thumb, the neutral track color after it. WebKit has no ::-moz-range-progress
+// equivalent, so the fill is driven by a gradient whose split tracks the value.
+function trackFill(slider) {
+  const min = parseInt(slider.min, 10) || 0;
+  const max = parseInt(slider.max, 10) || 0;
+  const val = parseInt(slider.value, 10) || 0;
+  const pct = max > min ? ((val - min) / (max - min)) * 100 : 0;
+  slider.style.background = `linear-gradient(to right, var(--link) ${pct}%, var(--reduce-30) ${pct}%)`;
+}
+
 // Wire a play/pause button to a range slider: clicking play auto-advances the
 // slider (dispatching "input" so the panel re-renders), runs the whole range in
 // ~6s regardless of frame count, then auto-stops at the end; clicking again
@@ -33,7 +51,7 @@ function attachPlay(button, slider) {
   const max = () => parseInt(slider.max, 10) || 0;
   const setPlaying = (on) => {
     button.setAttribute("data-playing", on ? "true" : "false");
-    button.textContent = on ? "⏸" : "▶";
+    button.innerHTML = on ? ICON_PAUSE : ICON_PLAY;
   };
   const stop = () => {
     if (timer) { clearInterval(timer); timer = null; }
@@ -51,10 +69,12 @@ function attachPlay(button, slider) {
   // A user grabbing the slider mid-play pauses at that point: input events the
   // loop did NOT dispatch (advancing === false) stop the animation.
   slider.addEventListener("input", () => {
+    trackFill(slider);
     if (timer && !advancing) stop();
   });
   setPlaying(false);
   button.disabled = false;
+  trackFill(slider);
   button.addEventListener("click", () => {
     if (timer) { stop(); return; } // pause
     if (parseInt(slider.value, 10) >= max()) {
@@ -111,6 +131,7 @@ function initForward(view, alphasBar) {
     slider.value = String(last); // default to the final timestep (t=399, pure noise)
     slider.disabled = false;
     renderAt(last);
+    trackFill(slider);
   };
 }
 
@@ -146,6 +167,7 @@ function initTraining(view) {
     slider.value = "0";
     slider.disabled = false;
     renderAt(0);
+    trackFill(slider);
   };
 }
 
@@ -189,6 +211,7 @@ function initReverse(view, alphasBar) {
     slider.value = "0"; // default to the noise start (index 0 = t = T-1 = 399)
     slider.disabled = false;
     renderStep(0);
+    trackFill(slider);
   };
 }
 
@@ -206,7 +229,7 @@ function buildLegend(el, entries) {
       const mark = document.createElement("span");
       mark.className = "lg-mark";
       mark.style.color = e.color;
-      mark.textContent = e.line ? "─" : "✕";
+      mark.textContent = e.line ? "─" : e.dot ? "●" : "✕";
       const label = document.createElement("span");
       label.className = "lg-label";
       label.innerHTML = e.label;
@@ -226,12 +249,13 @@ function initModes(modes) {
   slider.max = String(last);
   slider.value = String(last);
 
-  // in-canvas legends: x_T (noise) + one x_0 entry per mode color; the
-  // trajectories plot also lists the trajectory line.
-  const modeColors = modes.mode_clouds.map((c) => c.color);
+  // in-canvas legends, per SYMBOL (the markers now distinguish the series):
+  // ● x_T (noise) and ✕ x_0 (data modes); the trajectories plot also lists the
+  // trajectory line. Modes are multi-colored on the canvas, so the x_0 key uses
+  // a neutral color — the symbol, not the color, is what the legend explains.
   const baseLegend = [
-    { color: "#dc2626", label: "x<sub>T</sub>" },
-    ...modeColors.map((c) => ({ color: c, label: "x<sub>0</sub>" })),
+    { color: "#dc2626", label: "x<sub>T</sub>", dot: true },
+    { color: "#6b7280", label: "x<sub>0</sub>" },
   ];
   buildLegend($("modes-endpoints-legend"), baseLegend);
   buildLegend($("modes-canvas-legend"), [
@@ -246,7 +270,7 @@ function initModes(modes) {
     color: c.color,
     points: c.points.slice(0, Math.ceil(c.points.length / 2)),
   }));
-  const backdrop = [{ color: "#dc2626", points: modes.xT_cloud }, ...halfModeClouds];
+  const backdrop = [{ color: "#dc2626", points: modes.xT_cloud, marker: "dot" }, ...halfModeClouds];
 
   renderEndpoints($("modes-endpoints"), modes.xT_cloud, modeEnds, {
     view: modes.view,
@@ -263,6 +287,7 @@ function initModes(modes) {
       ghostColor: "rgba(0,0,0,0)",
       backdrop,
       solidStarts: modes.starts,
+      solidStartMarker: "dot",
       currentMarker: i === last ? "cross" : "dot",
       trail: showTraj.checked,
       smooth: smooth.checked,
@@ -279,6 +304,27 @@ function initModes(modes) {
   smooth.addEventListener("change", rerender);
   showTraj.addEventListener("change", rerender);
   attachPlay($("modes-play"), slider);
+}
+
+// Reflect the dataset bar's pinned ("stuck") state so CSS can restyle it (dark
+// background, more padding). A sticky bar pinned at top:0 has a viewport top of
+// 0; before it pins, its top is positive — so a rAF-throttled scroll check
+// toggles .stuck. (Checking the bar directly is robust to jump/programmatic
+// scrolls, which an IntersectionObserver sentinel can skip over.)
+function initStickyState() {
+  const bar = $("shape-bar");
+  if (!bar) return;
+  let ticking = false;
+  const update = () => {
+    ticking = false;
+    bar.classList.toggle("stuck", bar.getBoundingClientRect().top <= 1);
+  };
+  window.addEventListener(
+    "scroll",
+    () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } },
+    { passive: true }
+  );
+  update(); // initial state
 }
 
 async function boot() {
@@ -327,6 +373,7 @@ async function boot() {
     sel.disabled = false;
     sel.addEventListener("change", () => loadShape(sel.value));
 
+    initStickyState();
     document.body.setAttribute("data-app-state", "ready");
   } catch (err) {
     // Never swallow a load failure — surface it (no silent fallback).

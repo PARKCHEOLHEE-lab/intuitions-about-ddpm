@@ -1,14 +1,15 @@
 // Playwright config — drives the static docs/ site in a real Chromium.
 // The static site is served by Python's stdlib http.server (no app server),
 // matching the "0 server-side runtime" constraint: the server only hands out
-// files, all compute happens in the browser via Pyodide.
+// files; all rendering happens in the browser in pure JS from precomputed JSON.
 const { defineConfig, devices } = require('@playwright/test');
 
 const PORT = 5173;
 
 module.exports = defineConfig({
   testDir: './tests',
-  // Pyodide cold-start + micropip install can take a while on first load.
+  // Generous first-load budget: fetch the precomputed JSON, render KaTeX, and
+  // draw the canvases before assertions run.
   timeout: 120_000,
   expect: { timeout: 90_000 },
   fullyParallel: false,

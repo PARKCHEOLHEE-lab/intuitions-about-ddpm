@@ -97,17 +97,67 @@ p.hint { text-align: center; margin-bottom: 1.6em; }
 /* Panel slider rows get a line break of space above, separating the controls
    from the prose/equations that precede them (the shape-bar keeps its own
    symmetric 1.5em spacing). */
-p.controls { margin-top: 1.6em; }
+/* Panel control rows stay on ONE line (the slider shrinks to make room); the
+   options never wrap to a second line. The shape-bar (div.controls) is exempt —
+   it keeps wrapping its long descriptive note. */
+p.controls { margin-top: 1.6em; flex-wrap: nowrap; }
 .toggle { display: inline-flex; align-items: center; gap: 0.3em; }
+/* Toggle checkbox shares the play button's frame: a bordered rounded square
+   with a transparent fill and the same hover tint. A black check appears when
+   it is on (no colored accent). */
+.toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  width: 1.15em;
+  height: 1.15em;
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.toggle input[type="checkbox"]:hover { background: var(--reduce-14); }
+.toggle input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 0.3em;
+  height: 0.58em;
+  border: solid #000;
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+}
+
+/* Option A control row: a transport cluster (play + a grow-to-fill scrubber +
+   a live readout) grows to fill; a thin divider; then a lighter options
+   (toggles) cluster. On a narrow row the options wrap to a second line. */
+.controls .transport { display: flex; align-items: center; gap: 0.6em; flex: 1 1 auto; min-width: 0; }
+.controls .opts { display: flex; align-items: center; gap: 1em; flex: 0 0 auto; }
+.tval { font-family: var(--mono); font-size: 0.85em; color: var(--text-dark); white-space: nowrap; }
+/* The scrubber: thin track + link-colored thumb, grows to fill the transport. */
+.scrub { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 3px; background: var(--reduce-30); flex: 1 1 auto; min-width: 36px; outline: none; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--link); cursor: pointer; }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: var(--link); cursor: pointer; }
+.scrub:disabled { opacity: 0.5; cursor: default; }
+.scrub:disabled::-webkit-slider-thumb { background: var(--reduce-30); }
 
 /* Play button: flat, bordered, tints on hover; green ring while playing. */
 .play {
   cursor: pointer; border: 1px solid var(--reduce-30); background: transparent; color: inherit;
   border-radius: 4px; width: 1.9em; height: 1.9em; line-height: 1; font-size: 0.85em; padding: 0;
+  /* center the ▶/⏸ glyph in the box (block flow left it at the top) */
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .play:hover:not(:disabled) { background: var(--reduce-14); }
 .play:disabled { opacity: 0.4; cursor: default; }
-.play[data-playing="true"] { border-color: #16a34a; color: #16a34a; }
+/* Playing highlight uses the shared control accent (the slider-thumb blue);
+   the ▶/⏸ icon swap is what signals play vs pause. */
+.play[data-playing="true"] { border-color: var(--link); color: var(--link); }
+/* The icon is a square SVG centered by the button's flex box; its shape is
+   centered within the viewBox, so the visible ink lands dead-center. */
+.play-icon { width: 1em; height: 1em; display: block; fill: currentColor; }
 
 /* Side-by-side canvas figures; each flexes so 2–3 panels share one row and
    shrink to fit instead of overflowing, wrapping only on narrow screens. */
@@ -144,10 +194,18 @@ canvas { max-width: 100%; height: auto; display: block; margin-inline: auto; }
 #modes-panel .two-panel,
 #train-panel .two-panel { max-width: 46rem; margin-inline: auto; }
 
-.kv { list-style: none; padding: 0; display: flex; gap: 1.25em; flex-wrap: wrap; }
-.kv code, code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }
+code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }
 
 hr { border: none; border-top: 1px solid var(--divider); margin: 2em 0; }
+
+/* Inline citation links: small bracketed superscript references. */
+a.cite { color: var(--link); text-decoration: none; font-size: 0.85em; vertical-align: super; line-height: 0; padding: 0 0.05em; }
+a.cite:hover { text-decoration: underline; }
+
+/* References list rendered as [1], [2], … with a hanging indent. */
+ol.references { list-style: none; counter-reset: ref; padding-left: 0; margin: 0.6em 0; }
+ol.references li { counter-increment: ref; padding-left: 2.4em; text-indent: -2.4em; margin: 0.45em 0; color: var(--text-dark); font-size: calc(0.66rem + 0.2vw); }
+ol.references li::before { content: "[" counter(ref) "] "; }
 
 /* Error surface: populated only when a data fetch fails (no silent fallback). */
 #error {
@@ -163,5 +221,34 @@ hr { border: none; border-top: 1px solid var(--divider); margin: 2em 0; }
   font-size: calc(0.6rem + 0.2vw);
 }
 
-.shape-bar { gap: 0.75em; margin: 1.5em 0; }
+/* Global dataset selector: a bar pinned to the top of the viewport so the shape
+   can be changed from any panel while scrolling. Opaque background so content
+   scrolls cleanly underneath (no rule line). */
+.shape-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  gap: 0.75em;
+  margin: 1em 0;
+  padding: 0.5em 0;
+  background: var(--light);
+  transition: background-color 0.15s, color 0.15s, padding 0.15s;
+}
+/* Pinned state (toggled by an IntersectionObserver sentinel): invert to a dark
+   bar with white text and double the vertical padding so it reads as a header. */
+.shape-bar.stuck {
+  background: var(--dark);
+  color: var(--light);
+  padding-top: 1em;
+  padding-bottom: 1em;
+  /* Full-bleed the dark bar across the whole viewport: the content column is
+     centered by the body's symmetric padding, leaving white gutters left/right.
+     A large box-shadow paints those gutters in the same dark color, and
+     clip-path clips it vertically to the bar's own height so the shadow does
+     not spill down over the content scrolling beneath. The element box (and
+     thus its content) stays exactly at column width. */
+  box-shadow: 0 0 0 100vmax var(--dark);
+  clip-path: inset(0 -100vmax);
+}
+.shape-bar.stuck .hint { color: rgba(255, 255, 255, 0.72); }
 .shape-bar select { font-family: var(--font); font-size: 1em; padding: 0.15em 0.4em; }

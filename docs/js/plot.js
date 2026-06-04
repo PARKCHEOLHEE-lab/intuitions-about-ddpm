@@ -191,10 +191,10 @@ export function renderEndpoints(canvas, starts, ends, opts = {}) {
 
   ctx.clearRect(0, 0, W, H);
   ctx.lineWidth = 1.6;
-  // x_T starts (noise) — red crosses
+  // x_T starts (noise) — red DOTS (a distinct symbol from the x_0 crosses)
   const startColor = opts.startColor || "rgba(220,38,38,0.7)";
-  ctx.strokeStyle = startColor;
-  for (const [x, y] of starts) cross(sx(x), sy(y), 3.5);
+  ctx.fillStyle = startColor;
+  for (const [x, y] of starts) { ctx.beginPath(); ctx.arc(sx(x), sy(y), 2.6, 0, 2 * Math.PI); ctx.fill(); }
   // x_0 ends — solid, colored by mode
   const colors = opts.colors || null;
   for (let i = 0; i < ends.length; i++) {
@@ -207,7 +207,8 @@ export function renderEndpoints(canvas, starts, ends, opts = {}) {
   canvas.dataset.modeCount = String(colors ? new Set(colors).size : 1);
   canvas.dataset.view = String(view);
   canvas.dataset.center = `${cx},${cy}`;
-  canvas.dataset.marker = "cross";
+  canvas.dataset.marker = "cross";       // x_0 ends
+  canvas.dataset.startMarker = "dot";     // x_T starts
   canvas.dataset.startColor = startColor;
 }
 
@@ -231,8 +232,9 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   ctx.clearRect(0, 0, W, H);
 
   // 0) optional faint endpoint backdrop: the full x_T + x_0 clouds drawn behind
-  // the paths as low-alpha crosses (the modes figure's right panel), so the
-  // selected trajectories read against the same clusters shown solid on the left.
+  // the paths (the modes figure's right panel), so the selected trajectories
+  // read against the same clusters shown solid on the left. Each group may opt
+  // into a marker: x_T as dots, x_0 modes as × crosses.
   const backdrop = opts.backdrop || null;
   let backdropCount = 0;
   if (backdrop) {
@@ -241,13 +243,20 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
     ctx.lineWidth = 1.4;
     const bxr = 3.2;
     for (const grp of backdrop) {
+      const asDot = grp.marker === "dot";
       ctx.strokeStyle = grp.color;
+      ctx.fillStyle = grp.color;
       for (const [x, y] of grp.points) {
         const px = sx(x), py = sy(y);
         ctx.beginPath();
-        ctx.moveTo(px - bxr, py - bxr); ctx.lineTo(px + bxr, py + bxr);
-        ctx.moveTo(px + bxr, py - bxr); ctx.lineTo(px - bxr, py + bxr);
-        ctx.stroke();
+        if (asDot) {
+          ctx.arc(px, py, 2.4, 0, 2 * Math.PI);
+          ctx.fill();
+        } else {
+          ctx.moveTo(px - bxr, py - bxr); ctx.lineTo(px + bxr, py + bxr);
+          ctx.moveTo(px + bxr, py - bxr); ctx.lineTo(px - bxr, py + bxr);
+          ctx.stroke();
+        }
         backdropCount++;
       }
     }
@@ -349,18 +358,27 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
     checksum += x * 1.000001 + y;
   }
 
-  // 4) the SELECTED x_T starts as solid crosses (same opacity as the left panel),
-  // marking where the traced paths begin while the rest of the cloud stays faint.
+  // 4) the SELECTED x_T starts solid (same opacity as the left panel), marking
+  // where the traced paths begin while the rest of the cloud stays faint. They
+  // use the x_T symbol — dots — when solidStartMarker === "dot".
   const solidStarts = opts.solidStarts || [];
-  ctx.strokeStyle = opts.solidStartColor || "#dc2626";
+  const ssMarker = opts.solidStartMarker || "cross";
+  const ssColor = opts.solidStartColor || "#dc2626";
+  ctx.strokeStyle = ssColor;
+  ctx.fillStyle = ssColor;
   ctx.lineWidth = 1.8;
   const ssr = 3.8;
   for (const [x, y] of solidStarts) {
     const px = sx(x), py = sy(y);
     ctx.beginPath();
-    ctx.moveTo(px - ssr, py - ssr); ctx.lineTo(px + ssr, py + ssr);
-    ctx.moveTo(px + ssr, py - ssr); ctx.lineTo(px - ssr, py + ssr);
-    ctx.stroke();
+    if (ssMarker === "dot") {
+      ctx.arc(px, py, ssr * 0.7, 0, 2 * Math.PI);
+      ctx.fill();
+    } else {
+      ctx.moveTo(px - ssr, py - ssr); ctx.lineTo(px + ssr, py + ssr);
+      ctx.moveTo(px + ssr, py - ssr); ctx.lineTo(px - ssr, py + ssr);
+      ctx.stroke();
+    }
   }
 
   canvas.dataset.shape = opts.shape || "";
@@ -380,5 +398,6 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   canvas.dataset.trailColor = colors ? "multi" : baseColor;
   canvas.dataset.backdropCount = String(backdropCount);
   canvas.dataset.solidStartCount = String(solidStarts.length);
+  canvas.dataset.solidStartMarker = ssMarker;
   canvas.dataset.currentMarker = asCross ? "cross" : "dot";
 }
