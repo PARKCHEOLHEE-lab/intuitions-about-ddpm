@@ -55,6 +55,26 @@ test('toggle checkbox shares the play-button frame and shows a black check', asy
   expect(c.radius).toBe(p.radius);            // SAME corner radius as the play button
   expect(c.checkContent).not.toBe('none');    // a check is drawn when checked
   expect(c.checkColor).toBe('rgb(0, 0, 0)');  // the check is black
+
+  // and the box is the SAME rendered size as the play button (a matched set)
+  const cbox = await cb.evaluate((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; });
+  const pbox = await play.evaluate((el) => { const r = el.getBoundingClientRect(); return { w: r.width, h: r.height }; });
+  expect(Math.abs(cbox.w - pbox.w)).toBeLessThan(1.5);
+  expect(Math.abs(cbox.h - pbox.h)).toBeLessThan(1.5);
+
+  // the ✓ and the ▶ are similar in icon size (not one much bigger than the other):
+  // the rotated check's visual extent ≈ the play triangle's bbox, within ±40%
+  const tri = await play.evaluate((el) => {
+    const r = el.querySelector('svg polygon').getBoundingClientRect();
+    return Math.max(r.width, r.height);
+  });
+  const chk = await cb.evaluate((el) => {
+    const a = getComputedStyle(el, '::after');
+    const w = parseFloat(a.width), h = parseFloat(a.height);
+    return (w + h) / Math.SQRT2; // visual extent of the 45°-rotated checkmark
+  });
+  expect(chk).toBeGreaterThan(tri * 0.6);
+  expect(chk).toBeLessThan(tri * 1.4);
 });
 
 test('slider track fills with the accent up to the thumb position', async ({ page }) => {

@@ -45,3 +45,27 @@ test('every play button centers its icon ink in the button box', async ({ page }
     expect(Math.abs(r.shapeOffY), `${id} icon shape vertically centered in viewBox`).toBeLessThan(0.5);
   }
 });
+
+test('the play and pause icons fill a good fraction of the button', async ({ page }) => {
+  await page.goto('/index.html');
+  await expect(page.locator('body')).toHaveAttribute('data-app-state', 'ready');
+
+  const play = page.locator('#t-play');
+  // play triangle (default) is a sizable icon, not tiny in the box
+  const triFrac = await play.evaluate((btn) => {
+    const svg = btn.querySelector('svg');
+    const poly = btn.querySelector('svg polygon');
+    return poly.getBoundingClientRect().height / svg.getBoundingClientRect().height;
+  });
+  expect(triFrac).toBeGreaterThan(0.55);
+
+  // and after toggling, the pause bars are likewise sizable
+  await play.click();
+  await expect(play).toHaveAttribute('data-playing', 'true');
+  const barFrac = await play.evaluate((btn) => {
+    const svg = btn.querySelector('svg');
+    const rect = btn.querySelector('svg rect');
+    return rect.getBoundingClientRect().height / svg.getBoundingClientRect().height;
+  });
+  expect(barFrac).toBeGreaterThan(0.55);
+});

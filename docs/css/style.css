@@ -109,8 +109,10 @@ p.controls { margin-top: 1.6em; flex-wrap: nowrap; }
   appearance: none;
   -webkit-appearance: none;
   margin: 0;
-  width: 1.15em;
-  height: 1.15em;
+  font-size: 0.85em;   /* match the play button's em scale → identical box size */
+  width: 1.9em;
+  height: 1.9em;
+  flex: none;          /* keep the square from shrinking in the flex row */
   border: 1px solid var(--reduce-30);
   border-radius: 4px;
   background: transparent;
@@ -122,11 +124,11 @@ p.controls { margin-top: 1.6em; flex-wrap: nowrap; }
   content: "";
   position: absolute;
   left: 50%;
-  top: 45%;
-  width: 0.3em;
-  height: 0.58em;
+  top: 46%;
+  width: 0.27em;
+  height: 0.5em;
   border: solid #000;
-  border-width: 0 2px 2px 0;
+  border-width: 0 1.5px 1.5px 0;
   transform: translate(-50%, -55%) rotate(45deg);
 }
 

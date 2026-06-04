@@ -27,8 +27,8 @@ async function fetchJSON(path) {
 // 24×24 viewBox (triangle bbox x:[8,16] y:[6,18] → center 12,12; the two pause
 // bars are symmetric about 12), so the rendered ink centers exactly in the
 // button — a Unicode ▶/⏸ glyph cannot, since its ink sits off-center in the cell.
-const ICON_PLAY = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="8,6 8,18 16,12" /></svg>';
-const ICON_PAUSE = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="6" width="3.5" height="12" /><rect x="13.5" y="6" width="3.5" height="12" /></svg>';
+const ICON_PLAY = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><polygon points="7,5 7,19 17,12" /></svg>';
+const ICON_PAUSE = '<svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="5" width="3.5" height="14" /><rect x="13.5" y="5" width="3.5" height="14" /></svg>';
 
 // Paint a range slider's track as a "progress fill": the accent color up to the
 // thumb, the neutral track color after it. WebKit has no ::-moz-range-progress
