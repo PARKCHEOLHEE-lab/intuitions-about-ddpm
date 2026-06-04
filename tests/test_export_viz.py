@@ -394,14 +394,13 @@ def test_committed_reverse_is_dense():
     assert len(reverse["timesteps"]) == len(traj)
 
 
-DENSE_UNTIL = 300  # committed training snapshots record EVERY step up to here
+SNAPSHOT_INTERVAL = 200  # committed training snapshots step uniformly by this
 
 
 def test_committed_snapshots_interval():
-    # Per-shape training snapshots (dino): the EARLY region is recorded at a
-    # 1-step interval (snapshot_dense_until) so the fast initial shape formation
-    # is visible, then COARSE checkpoints cover the rest. The old uniform layout
-    # jumped ~2400 steps at once and hid the early dynamics.
+    # Per-shape training snapshots (dino) are recorded at a UNIFORM interval:
+    # 0, 200, 400, ... through the final optimizer step. (Replaces the old
+    # dense-early/coarse-late layout.)
     training_p = os.path.join(PRECOMPUTED_DIR, "training_dino.json")
     if not os.path.exists(training_p):
         pytest.skip("committed precomputed artifacts not present")
@@ -414,16 +413,15 @@ def test_committed_snapshots_interval():
     assert all(steps[i] < steps[i + 1] for i in range(len(steps) - 1))
     assert len(training["snapshots"]) == len(steps)
 
-    # the first DENSE_UNTIL+1 checkpoints step by EXACTLY 1 (0,1,2,...,DENSE_UNTIL)
-    assert steps[: DENSE_UNTIL + 1] == list(range(DENSE_UNTIL + 1)), (
-        "early snapshots must snap at 1-step interval through "
-        f"step {DENSE_UNTIL}; got {steps[:5]}...{steps[DENSE_UNTIL - 2:DENSE_UNTIL + 2]}"
+    gaps = [steps[i + 1] - steps[i] for i in range(len(steps) - 1)]
+    # every interior gap is EXACTLY the uniform interval; only the final gap may
+    # be shorter (when total_steps isn't an exact multiple of the interval).
+    assert all(g == SNAPSHOT_INTERVAL for g in gaps[:-1]), (
+        f"snapshots must step by {SNAPSHOT_INTERVAL}; got {steps[:5]}..."
     )
-    # beyond the dense region the checkpoints are coarse (a gap larger than 1)
-    assert steps[-1] > DENSE_UNTIL
-    assert any(steps[i + 1] - steps[i] > 1 for i in range(len(steps) - 1)), (
-        "expected coarse checkpoints (gap > 1) after the dense region"
-    )
+    assert 0 < gaps[-1] <= SNAPSHOT_INTERVAL
+    # i.e. the steps are exactly range(0, last+1, INTERVAL) (+ a final tail step)
+    assert steps[:-1] == list(range(0, steps[-2] + 1, SNAPSHOT_INTERVAL))
 
 
 def test_committed_reverse_records_every_timestep():

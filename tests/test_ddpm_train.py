@@ -41,6 +41,19 @@ def _config(n):
     }
 
 
+def test_train_module_has_no_standalone_main_block():
+    """train.py exposes only the config-agnostic Trainer; the dead
+    __main__ block (a divergent standalone config that nothing executes,
+    contradicting the exported viz config) has been removed."""
+    import pathlib
+
+    import train
+
+    assert hasattr(train, "Trainer")  # the importable Trainer is preserved
+    src = pathlib.Path(train.__file__).read_text()
+    assert '__main__' not in src  # no standalone-config block remains
+
+
 def test_trainer_feeds_noised_xt_not_clean_x0():
     torch.manual_seed(0)
     n = 16

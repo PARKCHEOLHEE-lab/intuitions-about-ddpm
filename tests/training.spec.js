@@ -1,6 +1,5 @@
-// Training viewer: step through the densely-sampled training snapshots. The
-// early region (≤ step 300) is recorded at a 1-step interval so the fast initial
-// shape formation is visible; the rest is coarse.
+// Training viewer: step through training snapshots recorded at a UNIFORM
+// 200-step interval (0, 200, 400, ... through the final optimizer step).
 const { test, expect } = require('@playwright/test');
 
 async function ready(page) {
@@ -8,21 +7,21 @@ async function ready(page) {
   await expect(page.locator('body')).toHaveAttribute('data-app-state', 'ready');
 }
 
-// Many snapshots are reachable (dense early region → max well past 300), the
-// canvas is the full 200-point dataset, and the EARLY snapshots advance the
-// training step by exactly 1 (the dense 1-step interval, not the old ~2400 jump).
-test('KR1: dense snapshots reachable, early steps advance by 1, 200 points', async ({ page }) => {
+// Many snapshots are reachable (200-step interval over ~95k steps → max well
+// past 300), the canvas is the full 200-point dataset, and each snapshot
+// advances the training step by exactly 200 (not the old ~2400 jump / 1-step).
+test('KR1: 200-step snapshots reachable, step advances by 200, 200 points', async ({ page }) => {
   await ready(page);
 
   const slider = page.locator('#snapshot-slider');
   await expect(slider).toBeEnabled();
   const max = parseInt((await slider.getAttribute('max')) || '0', 10);
-  expect(max).toBeGreaterThanOrEqual(300); // dense region 0..300 + coarse beyond
+  expect(max).toBeGreaterThanOrEqual(300); // ~475 snapshots at a 200-step interval
 
   const canvas = page.locator('#snapshots-canvas');
   await expect(canvas).toHaveAttribute('data-point-count', '200');
 
-  // index 0 → step 0 (untrained); index 1 → step 1 (1-step dense interval)
+  // index 0 → step 0 (untrained); index 1 → step 200 (uniform 200-step interval)
   await slider.fill('0');
   await slider.dispatchEvent('input');
   await expect(page.locator('#train-step')).toHaveText('0');
@@ -30,7 +29,7 @@ test('KR1: dense snapshots reachable, early steps advance by 1, 200 points', asy
 
   await slider.fill('1');
   await slider.dispatchEvent('input');
-  await expect(page.locator('#train-step')).toHaveText('1');
+  await expect(page.locator('#train-step')).toHaveText('200');
 
   // stepping all the way to the end changes the rendered cloud (later training)
   await slider.fill(String(max));

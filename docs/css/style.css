@@ -79,25 +79,25 @@ a { color: var(--link); text-decoration: inherit; }
 a:hover { text-decoration: underline; }
 
 /* Display equations: room to breathe, scroll if too wide on mobile. */
-p.eq { margin: 0.9em 0; overflow-x: auto; overflow-y: hidden; }
+/* Block equations: top spacing as-is, extra breathing room below (about one
+   blank line) so the following prose isn't crowded. */
+p.eq { margin: 0.9em 0 2em; overflow-x: auto; overflow-y: hidden; }
 .katex { font-size: 1.05em; }
 .katex-display { margin: 0.4em 0; }
 
-/* Plain-language callout tying the math to the interactive panel — a flat
-   blockquote-style surface (subtle bg + hairline left rule, no shadow). */
-.explain {
-  margin: 0.9em 0 0;
-  padding: 0.7em 1em;
-  background: var(--bg-subtle);
-  border-left: 3px solid var(--reduce-90);
-  border-radius: 0 4px 4px 0;
-  color: var(--text-chat, #343541);
-}
+/* Plain-language explanation tying the math to the interactive panel — styled
+   as ordinary body text, not a callout box. */
+.explain { margin: 0.9em 0 0; text-align: justify; }
 .hint { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin: 0.3em 0 0; }
-.legend { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin: 0.4em 0 0; display: flex; align-items: center; flex-wrap: wrap; }
-.legend .sw { display: inline-block; width: 0.7em; height: 0.7em; border-radius: 2px; margin: 0 1px; }
+/* Figure caption hints read centered under their figures (the shape-bar's
+   span.hint note keeps its default left alignment). */
+p.hint { text-align: center; margin-bottom: 1.6em; }
 
 .controls { display: flex; gap: 1em; align-items: center; flex-wrap: wrap; margin: 0.5em 0; }
+/* Panel slider rows get a line break of space above, separating the controls
+   from the prose/equations that precede them (the shape-bar keeps its own
+   symmetric 1.5em spacing). */
+p.controls { margin-top: 1.6em; }
 .toggle { display: inline-flex; align-items: center; gap: 0.3em; }
 
 /* Play button: flat, bordered, tints on hover; green ring while playing. */
@@ -111,13 +111,36 @@ p.eq { margin: 0.9em 0; overflow-x: auto; overflow-y: hidden; }
 
 /* Side-by-side canvas figures; each flexes so 2–3 panels share one row and
    shrink to fit instead of overflowing, wrapping only on narrow screens. */
-.two-panel { display: flex; gap: 1.25em; flex-wrap: wrap; align-items: flex-start; }
-.two-panel figure { margin: 0; flex: 1 1 200px; min-width: 0; }
-.two-panel figcaption { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin-bottom: 0.25em; }
+/* Figures stay on ONE row (1×N) at every width — they shrink together rather
+   than collapsing into a ragged 2+1 wrap. nowrap + zero basis = equal columns. */
+.two-panel { display: flex; gap: 1.25em; flex-wrap: nowrap; align-items: flex-start; }
+/* Each canvas flexes to an equal share of the row. Per-canvas labels were
+   merged into one paper-style caption below the row (the panel's p.hint). */
+.two-panel figure { margin: 0; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; position: relative; }
+
+/* In-canvas legend overlaid on the plot's top-left (matplotlib-style): a colored
+   × per series + label, on a faint backdrop so it reads over the scatter. */
+.canvas-legend {
+  position: absolute; top: 0.4em; left: 0.4em; z-index: 1;
+  display: flex; flex-direction: column; gap: 0.05em;
+  font-size: calc(0.5rem + 0.18vw); color: var(--text-dark);
+  background: rgba(255, 255, 255, 0.65); padding: 0.15em 0.4em; border-radius: 3px;
+  pointer-events: none;
+}
+.canvas-legend .lg-row { display: flex; align-items: center; gap: 0.35em; }
+.canvas-legend .lg-mark { font-weight: 700; line-height: 1; }
+.canvas-legend .lg-label { font-style: italic; }
+.canvas-legend .lg-note { margin-left: 1.1em; font-style: italic; opacity: 0.75; }
 /* Single canvases keep their intrinsic size (shrinking on small screens);
    only side-by-side figures stretch to fill their flex share. */
-canvas { max-width: 100%; height: auto; }
+/* Canvases are centered: any canvas narrower than its container sits in the
+   middle of the column rather than hugging the left edge. */
+canvas { max-width: 100%; height: auto; display: block; margin-inline: auto; }
 .two-panel canvas { width: 100%; }
+
+/* The intro transport figure is a 2-canvas overview, not a main panel — cap its
+   width so the two canvases stay modest, and center the capped block. */
+#modes-panel .two-panel { max-width: 46rem; margin-inline: auto; }
 
 .kv { list-style: none; padding: 0; display: flex; gap: 1.25em; flex-wrap: wrap; }
 .kv code, code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }

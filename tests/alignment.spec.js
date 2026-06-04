@@ -29,3 +29,18 @@ test('prose, callout and figure module share one aligned column', async ({ page 
   expect(Math.abs(para.right - module.right)).toBeLessThanOrEqual(1);
   expect(Math.abs(callout.right - module.right)).toBeLessThanOrEqual(1);
 });
+
+// At a narrow width the 1×3 figure row must NOT collapse to a 2+1 wrap — all
+// three figures stay on the same row (same top y), shrinking together.
+test('forward 1x3 figures stay on one row at a narrow width', async ({ page }) => {
+  await page.setViewportSize({ width: 600, height: 900 });
+  await ready(page);
+
+  const tops = await page.evaluate(() =>
+    ['forward-endpoint', 'forward-scatter', 'forward-density'].map(
+      (id) => document.getElementById(id).getBoundingClientRect().top
+    )
+  );
+  // all three share one row → tops equal within a few px
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4);
+});

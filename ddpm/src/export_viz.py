@@ -910,13 +910,13 @@ if __name__ == "__main__":
         "denoiser_residual": True,
         "denoiser_output_dim": 2,
         "denoiser_activation": "GELU",
-        # DENSE early snapshots: record EVERY optimizer step up to step 300 (where
-        # the shape forms fastest), then COARSE checkpoints every 2400 steps for the
-        # rest. Restores the visible early-learning dynamics that uniform-40 hid by
-        # jumping ~2400 steps at once. k_snapshots is ignored when coarse_every set.
+        # UNIFORM snapshots: record a checkpoint every 200 optimizer steps
+        # (0, 200, 400, ... through the final step). dense_until=0 disables the
+        # dense early region, so the interval is even throughout.
+        # k_snapshots is ignored when coarse_every is set.
         "k_snapshots": 1,
-        "snapshot_dense_until": 300,
-        "snapshot_coarse_every": 2400,
+        "snapshot_dense_until": 0,
+        "snapshot_coarse_every": 200,
         "reverse_record_every": 1,  # record every diffusion timestep (t=399..0)
         "shapes": None,  # None == all mapped Datasaurus shapes
         "seed": 0,

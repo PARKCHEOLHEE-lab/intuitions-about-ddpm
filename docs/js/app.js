@@ -182,6 +182,30 @@ function initReverse(view, alphasBar) {
   };
 }
 
+// Populate an in-canvas legend: each entry is a colored × (or ─ for a line),
+// followed by its italic label; entries with only `note` render as a sub-line.
+function buildLegend(el, entries) {
+  el.innerHTML = "";
+  for (const e of entries) {
+    const row = document.createElement("span");
+    if (e.note) {
+      row.className = "lg-note";
+      row.innerHTML = e.note;
+    } else {
+      row.className = "lg-row";
+      const mark = document.createElement("span");
+      mark.className = "lg-mark";
+      mark.style.color = e.color;
+      mark.textContent = e.line ? "─" : "✕";
+      const label = document.createElement("span");
+      label.className = "lg-label";
+      label.innerHTML = e.label;
+      row.append(mark, label);
+    }
+    el.appendChild(row);
+  }
+}
+
 // --- Intro: noise → data transport (shape-agnostic, initialized once) --------
 function initModes(modes) {
   const slider = $("modes-slider");
@@ -191,6 +215,20 @@ function initModes(modes) {
   slider.min = "0";
   slider.max = String(last);
   slider.value = String(last);
+
+  // in-canvas legends: x_T (noise) + one x_0 entry per mode color; the
+  // trajectories plot also lists the trajectory line.
+  const modeColors = modes.mode_clouds.map((c) => c.color);
+  const baseLegend = [
+    { color: "#dc2626", label: "x<sub>T</sub>" },
+    ...modeColors.map((c) => ({ color: c, label: "x<sub>0</sub>" })),
+  ];
+  buildLegend($("modes-endpoints-legend"), baseLegend);
+  buildLegend($("modes-canvas-legend"), [
+    ...baseLegend,
+    { color: "#9ca3af", label: "trajectory", line: true },
+    { note: "x<sub>T</sub> → x<sub>T-1</sub> → ⋯ → x<sub>0</sub>" },
+  ]);
 
   const modeEnds = modes.mode_clouds.flatMap((c) => c.points);
   const modeEndColors = modes.mode_clouds.flatMap((c) => c.points.map(() => c.color));

@@ -26,13 +26,13 @@
 
     <section id="diffusion-process-panel">
       <h2>What does "diffusion" mean?</h2>
-      <p>The name comes from physics. <strong>Diffusion</strong> (확산) is the everyday process where particles packed into one spot gradually spread out until they fill the whole space evenly — a drop of ink dissolving in water, or a puff of smoke thinning into a room.</p>
+      <p>The name comes from physics. <strong>Diffusion</strong> is the everyday process where particles packed into one spot gradually spread out until they fill the whole space evenly — a drop of ink dissolving in water, or a puff of smoke thinning into a room.</p>
       <p>Now zoom in on a <em>single</em> particle and photograph it at tiny time intervals. Step to step, it does not move in a straight line — it gets nudged in a random direction each instant. Those nudges are <strong>Gaussian</strong>: each step is drawn from a normal distribution $\mathcal{N}(\mu, \sigma^2)$. So the particle's path is a <em>Gaussian random walk</em>, and the cloud of many such particles is what we see spreading out.</p>
       <p>Here is the key idea that makes generation possible: if every step is a known Gaussian, and we could figure out the distribution of each step, then we could run the whole walk <strong>backward</strong> — start from the fully spread-out noise and retrace the steps until the particles gather back into their original shape. A diffusion model is exactly that: the spreading is the fixed <em>forward</em> process, and a neural network learns to <em>reverse</em> it. You can watch this happen on real data in the panels below.</p>
     </section>
 
     <section id="modes-panel">
-      <h2>Sampling as transport: noise → data</h2>
+      <h2>Sampling trajectories: noise → data</h2>
       <p>Before the dino, here is the core picture on a simpler dataset — a few Gaussian <em>modes</em>. Sampling starts every point at noise ($x_T$) and walks it, step by step, into one of the data modes ($x_0$). Drag the slider over $t$ to animate the transport; each path is colored by the mode it lands in.</p>
       <div class="module">
         <div class="viz">
@@ -45,15 +45,15 @@
           </p>
           <div class="two-panel">
             <figure>
-              <figcaption>endpoints (x<sub>T</sub> → x<sub>0</sub>)</figcaption>
+              <div class="canvas-legend" id="modes-endpoints-legend"></div>
               <canvas id="modes-endpoints" width="420" height="420" aria-label="endpoints"></canvas>
             </figure>
             <figure>
-              <figcaption>trajectories</figcaption>
+              <div class="canvas-legend" id="modes-canvas-legend"></div>
               <canvas id="modes-canvas" width="420" height="420" aria-label="trajectory transport"></canvas>
             </figure>
           </div>
-          <p class="legend"><span class="sw" style="background:#dc2626"></span> x<sub>T</sub> (noise start) &nbsp;·&nbsp; <span class="sw" style="background:#6d28d9"></span><span class="sw" style="background:#f59e0b"></span><span class="sw" style="background:#16a34a"></span><span class="sw" style="background:#6b7280"></span> x<sub>0</sub> modes (by color)</p>
+          <p class="hint">Sampling trajectories. <em>(Left)</em> endpoints — the noise prior $x_T$ and the data modes $x_0$. <em>(Right)</em> each reverse-sampling trajectory carried from noise into one of the modes.</p>
         </div>
         <p class="explain" id="modes-explain">Each colored path is one reverse-sampling trajectory: it begins as noise (the faint red $x_T$ ghosts) and is denoised step by step until it settles into one of the data modes. With only a handful of points you can trace the individual trajectories fanning out — the same transport happens with the 200-point dino below, just too densely to follow any single path.</p>
       </div>
@@ -65,7 +65,7 @@
     </div>
 
     <section id="forward-panel">
-      <h2>1 · Forward diffusion <code>q</code></h2>
+      <h2>Forward diffusion</h2>
       <p>The data $x_0$ — points forming a dinosaur — is <strong>standardized</strong> to zero mean and unit variance. That standardization is what makes the fully-noised end state exactly $\mathcal{N}(0, I)$, the distribution we later sample from. Forward diffusion dissolves this shape into noise; the trained model learns to rebuild it.</p>
       <p>Each step adds Gaussian noise scaled by a small variance $\beta_t$:</p>
       <p class="eq">$$q(x_t \mid x_{t-1}) = \mathcal{N}\!\big(x_t;\ \sqrt{1-\beta_t}\,x_{t-1},\ \beta_t I\big)$$</p>
@@ -74,20 +74,6 @@
       <p>As $t$ grows, $\bar\alpha_t\to 0$: the data term fades and the noise term takes over, so $x_T\approx\mathcal{N}(0,I)$. Here $T=400$ and $\bar\alpha_t$ follows a <em>cosine schedule</em> (Nichol &amp; Dhariwal), which holds onto the signal longer than a linear ramp before fading to pure noise — small steps, so the shape erodes smoothly.</p>
       <div class="module">
         <div class="viz">
-          <div class="two-panel">
-            <figure>
-              <figcaption>x₀ data</figcaption>
-              <canvas id="forward-endpoint" width="420" height="420" aria-label="x0 data"></canvas>
-            </figure>
-            <figure>
-              <figcaption>x<sub>t</sub> trajectories</figcaption>
-              <canvas id="forward-scatter" width="420" height="420" aria-label="x_t scatter"></canvas>
-            </figure>
-            <figure>
-              <figcaption>distribution q(x<sub>t</sub>)</figcaption>
-              <canvas id="forward-density" width="420" height="420" aria-label="x_t distribution"></canvas>
-            </figure>
-          </div>
           <p class="controls">
             <button type="button" class="play" id="t-play" aria-label="play animation" disabled>▶</button>
             <label>timestep t: <input type="range" id="t-slider" min="0" max="0" value="0" disabled /></label>
@@ -95,33 +81,44 @@
             <label class="toggle"><input type="checkbox" id="forward-show-traj" checked /> show trajectories</label>
             <label class="toggle"><input type="checkbox" id="forward-smooth" checked /> smooth trajectories</label>
           </p>
-          <p class="hint">Left: precomputed forward samples (t is the diffusion timestep). Right: the analytic distribution q(x<sub>t</sub>) of the x-coordinate — multimodal data smoothly widening into a single Gaussian as noise takes over.</p>
+          <div class="two-panel">
+            <figure>
+              <canvas id="forward-endpoint" width="420" height="420" aria-label="x0 data"></canvas>
+            </figure>
+            <figure>
+              <canvas id="forward-scatter" width="420" height="420" aria-label="x_t scatter"></canvas>
+            </figure>
+            <figure>
+              <canvas id="forward-density" width="420" height="420" aria-label="x_t distribution"></canvas>
+            </figure>
+          </div>
+          <p class="hint">Forward diffusion. <em>(Left)</em> the clean data $x_0$. <em>(Middle)</em> one point's noisy $x_t$ path at the current timestep $t$. <em>(Right)</em> the analytic marginal $q(x_t)$ of the x-coordinate — multimodal data smoothly widening into a single Gaussian as noise takes over.</p>
         </div>
         <p class="explain" id="forward-explain">Forward diffusion gradually adds Gaussian noise. Drag the slider to step from the clean dino ($t=0$) toward pure noise ($t=T$). The faint dots are the original shape; each thin line traces one point's actual <em>step-by-step</em> path through the Markov chain $q(x_t\mid x_{t-1})$ — a fresh kick $\sqrt{1-\alpha_t}\,z$ is added at every step, so the trajectory is a jittery random walk, exactly like reverse sampling. The closed form above jumps to the same $x_t$ <em>distribution</em> in one shot, but plugging in a single fixed $\varepsilon$ would draw an artificially smooth curve; here we show the real noisy trajectory for consistency.</p>
       </div>
     </section>
 
     <section id="train-panel">
-      <h2>2 · Training the denoiser</h2>
+      <h2>Training the denoiser</h2>
       <p>The reverse step is also approximately Gaussian. Rather than predict its mean directly, the network predicts the <strong>noise</strong> $\varepsilon_\theta(x_t, t)$ that was added — a simpler, better-behaved target. Training minimizes the mean-squared error between the true and predicted noise:</p>
       <p class="eq">$$\mathcal{L} = \mathbb{E}_{x_0,\,t,\,\varepsilon}\Big[\,\big\lVert\, \varepsilon - \varepsilon_\theta\big(\sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon,\ t\big)\,\big\rVert^2\,\Big]$$</p>
       <p>One training step: draw a data point $x_0$, a random timestep $t\sim\mathrm{Uniform}\{1,\dots,T\}$, and noise $\varepsilon$; build the noisy $x_t$ with the closed form above; ask the network for $\varepsilon_\theta$; take a gradient step on the MSE. Since any $t$ is reachable directly, no step-by-step simulation is needed during training.</p>
       <div class="module">
         <div class="viz">
-          <canvas id="snapshots-canvas" width="420" height="420" aria-label="generated samples snapshot"></canvas>
           <p class="controls">
             <button type="button" class="play" id="snapshot-play" aria-label="play animation" disabled>▶</button>
             <label>snapshot: <input type="range" id="snapshot-slider" min="0" max="0" value="0" disabled /></label>
             <span>after <code id="train-step">—</code> steps</span>
           </p>
-          <p class="hint">Each snapshot shows samples generated by the model after the given number of optimizer steps.</p>
+          <canvas id="snapshots-canvas" width="420" height="420" aria-label="generated samples snapshot"></canvas>
+          <p class="hint">Training the denoiser. Each snapshot shows the samples the model generates from pure noise after the given number of optimizer steps.</p>
         </div>
         <p class="explain" id="train-explain">The denoiser is trained to predict the noise added at each step. Each snapshot shows points it generates from pure noise after a given number of training steps — a shapeless blob early on, sharpening into a dino as training proceeds. The early region is sampled densely (every step) because the shape forms fastest there.</p>
       </div>
     </section>
 
     <section id="reverse-panel">
-      <h2>3 · Reverse sampling <code>x_T → … → x₀</code></h2>
+      <h2>Reverse sampling</h2>
       <p>To generate, start from noise $x_T\sim\mathcal{N}(0,I)$ and undo one step at a time. Substituting the predicted noise into the reverse posterior gives its mean:</p>
       <p class="eq">$$\mu_\theta(x_t, t) = \frac{1}{\sqrt{\alpha_t}}\Big(x_t - \frac{\beta_t}{\sqrt{1-\bar\alpha_t}}\,\varepsilon_\theta(x_t, t)\Big)$$</p>
       <p>and each ancestral step re-injects a little fresh noise — this is what makes sampling stochastic:</p>
@@ -136,29 +133,21 @@
             <label class="toggle"><input type="checkbox" id="reverse-show-traj" checked /> show trajectories</label>
             <label class="toggle"><input type="checkbox" id="reverse-smooth" checked /> smooth trajectories</label>
           </p>
-          <p class="hint">Smoothing is <strong>cosmetic only</strong> — it draws a smoothed curve (Chaikin corner-cutting) through each point's path so the random walk reads as a curve. The dots (actual $x_t$) and the sampling math are unchanged. Toggle off to see the true stochastic path with its fresh $\sqrt{\beta_t}\,z$ kick at every step.</p>
           <div class="two-panel">
             <figure>
-              <figcaption>x₀ samples</figcaption>
               <canvas id="reverse-x0" width="420" height="420" aria-label="x0 samples"></canvas>
             </figure>
             <figure>
-              <figcaption>trajectories</figcaption>
               <canvas id="reverse-traj" width="420" height="420" data-path-count="0" data-step-count="0" aria-label="trajectories"></canvas>
             </figure>
             <figure>
-              <figcaption>distribution q(x<sub>t</sub>)</figcaption>
               <canvas id="reverse-density" width="420" height="420" aria-label="x_t distribution"></canvas>
             </figure>
           </div>
+          <p class="hint">Reverse sampling. <em>(Left)</em> the generated samples $x_0$. <em>(Middle)</em> reverse trajectories carried from noise back to data. <em>(Right)</em> the analytic marginal $q(x_t)$ gathering from a single Gaussian back into multimodal data.</p>
         </div>
-        <p class="explain" id="reverse-explain">Sampling runs the process backward: start from pure noise and, step by step, subtract the model's predicted noise. Drag the slider over the timestep $t$ (from $T-1$ down to $0$) to watch the cloud collapse from noise into the dino. Unlike the smooth forward paths, the reverse trajectories look jittery — the $\sqrt{\beta_t}\,z$ term adds a fresh random kick at every step.</p>
+        <p class="explain" id="reverse-explain">Sampling runs the process backward: start from pure noise and, step by step, subtract the model's predicted noise. Drag the slider over the timestep $t$ (from $T-1$ down to $0$) to watch the cloud collapse from noise into the dino. Like the forward paths, these reverse trajectories are jittery — the $\sqrt{\beta_t}\,z$ term adds a fresh random kick at every step.</p>
       </div>
-    </section>
-
-    <section id="followup-panel">
-      <h2>Where this goes next</h2>
-      <p>The same recipe scales from 2-D dots to images: swap the small MLP for a U-Net, the dino for millions of photos, add text conditioning, and you get systems like Stable Diffusion. Common refinements include the cosine noise schedule, learned variances, faster samplers such as DDIM, and classifier-free guidance.</p>
     </section>
 
     <!-- Error surface: populated only when a data fetch fails (no silent fallback). -->

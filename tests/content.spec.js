@@ -15,9 +15,8 @@ test('math equations render via vendored KaTeX', async ({ page }) => {
 
 test('concept sections pair equations with the interactive panels', async ({ page }) => {
   await ready(page);
-  // framing sections
+  // framing section
   await expect(page.locator('#intro-panel')).toContainText(/forward/i);
-  await expect(page.locator('#followup-panel')).toContainText(/U-Net|Stable Diffusion|DDIM/);
   // block equations across forward / training / reverse (q, closed form, loss, mean, ancestral step)
   expect(await page.locator('.katex-display').count()).toBeGreaterThanOrEqual(4);
   // each viz section keeps its plain-language callout

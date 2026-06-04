@@ -1,41 +1,73 @@
 # Intuitions about Diffusion Models — interactive page
 
-A **static** site that teaches diffusion models (DDPM) on the 2D **dino**
-(datasaurus) toy dataset. The model is trained **offline in PyTorch**; an export
-step precomputes every visualization frame to JSON, and the browser is a
+A **static** site that teaches diffusion models (DDPM) on the 2D
+**Datasaurus** toy shapes. The model is trained **offline in PyTorch**; an
+export step precomputes every visualization frame to JSON, and the browser is a
 **pure-JavaScript viewer** that fetches and replays them. There is no Python in
 the browser (no Pyodide) and no server-side runtime — just static files.
 
 ## Architecture
 
 ```
-ddpm/src/export_viz.py   (offline, torch)   →   docs/data/precomputed/*.json
-                                             →   docs/data/source/*.py  (real torch source for the code panels)
-docs/js/app.js           (browser, pure JS) →   fetches the above and renders with docs/js/plot.js
+ddpm/src/export_viz.py  (offline, torch)  →  docs/data/precomputed/
+    ├─ meta.json               shape list + shared view + per-shape x0 + ᾱ_t schedule
+    ├─ modes.json              intro "Sampling trajectories" figure (Gaussian-mode toy)
+    ├─ forward_<shape>.json    forward x_t frames, per shape
+    ├─ training_<shape>.json   generated-sample snapshots, per shape
+    └─ reverse_<shape>.json    reverse trajectory + final x0, per shape
+
+docs/js/app.js  (browser, pure JS)  →  fetches the above, renders via docs/js/plot.js
 ```
 
-- **`docs/data/precomputed/`** — `meta.json` (dino template + schedule meta),
-  `forward.json` (x_t frames), `training.json` (generated-sample snapshots),
-  `reverse.json` (sampling trajectory + final x_0).
-- **`docs/data/source/`** — `ddpm.py` and `train.py`, the real torch source
-  shown verbatim in the code panels.
-- **`docs/js/app.js`** — bootstrap viewer; **`docs/js/plot.js`** — shared
-  `renderScatter` / `renderTrajectory` canvas renderers.
+`export_viz.py`'s `__main__` runs two steps into `docs/data/precomputed/`:
+`export_all_shapes()` (per-shape `forward_/training_/reverse_<shape>.json` plus a
+single `meta.json`) and `export_modes_figure()` (`modes.json`).
 
-Only **dino** is precomputed, so the page renders dino only; the old
-multi-shape switcher has been removed.
+- **`docs/data/precomputed/`**
+  - `meta.json` — shape order, the shared view/scale, each shape's clean `x0`
+    scatter, and the cumulative `alphas_bar` (ᾱ_t) schedule the JS reads.
+  - `modes.json` — the intro figure: a tiny DDPM on a few 2D Gaussian modes,
+    with endpoint clouds + per-trajectory coloring.
+  - `forward_<shape>.json` / `training_<shape>.json` / `reverse_<shape>.json` —
+    one set per Datasaurus shape (lazy-loaded when the shape selector changes).
+- **`docs/js/app.js`** — bootstrap viewer (fetch + wire sliders/play/toggles).
+- **`docs/js/plot.js`** — shared canvas renderers (`renderScatter`,
+  `renderForwardFrame`, `renderEndpoints`, `renderDensityCurve`).
+- **`docs/js/math.js`** — renders the inline/display math via vendored KaTeX.
 
-## The three modules
+One **conditional** model is trained over **all** Datasaurus shapes, so the
+shape selector near the top switches every panel between shapes (the page loads
+**dino** first); the data per shape is lazy-loaded on demand.
 
-1. **Forward diffusion `q(x₀, t, ε)`** — scrub the slider to step through the
-   precomputed forward frames and watch the data turn into noise. The slider
-   index maps to the real timestep `t`. The torch `q()` source is shown.
-2. **Training** — step through the K=5 precomputed sample snapshots (samples
-   generated after increasing numbers of optimizer steps). The torch training
-   source is shown.
-3. **Reverse sampling `x_T → … → x₀`** — the two-panel reference figure (final
-   x₀ cluster + per-point trajectories), replayed from `reverse.json`. The
-   torch `p()` source is shown.
+## The page
+
+Top to bottom:
+
+1. **What is a diffusion model?** — prose framing (forward noising + learned
+   reverse).
+2. **What does "diffusion" mean?** — the physical-spreading intuition (Gaussian
+   random walk), prose only.
+3. **Sampling trajectories: noise → data** — the intro figure (`modes.json`):
+   a few Gaussian modes, with each reverse-sampling trajectory carried from
+   noise into one mode. Endpoints panel + trajectories panel.
+4. **Forward diffusion** — scrub the timestep `t` to watch a shape dissolve into
+   noise. Three canvases: static `x0`, the per-point `x_t` trajectory, and the
+   analytic marginal `q(x_t)`.
+5. **Training the denoiser** — step through generated-sample snapshots. Snapshots
+   are recorded **densely** (every optimizer step up to step 300, where the
+   shape forms fastest) and coarsely afterward.
+6. **Reverse sampling** — three canvases: generated `x0`, the reverse
+   trajectories (noise → data), and the marginal `q(x_t)` gathering back into the
+   multimodal data.
+
+## Model / schedule
+
+The exported model uses **T = 400** timesteps and a **cosine** ᾱ_t schedule
+(Nichol & Dhariwal), sampled from **EMA-averaged** weights for cleaner output.
+See the `cfg` in `ddpm/src/export_viz.py` for the full hyperparameters. (Note:
+`ddpm/src/train.py` exposes only the config-agnostic `Trainer` class — the viz
+data is produced by `export_viz.py`'s own training loop and config, not by
+`train.py`.)
 
 ## Regenerate the precomputed data
 
@@ -43,24 +75,23 @@ multi-shape switcher has been removed.
 ./.venv/bin/python ddpm/src/export_viz.py
 ```
 
-This retrains/exports and overwrites the files under `docs/data/`.
+This retrains and overwrites the files under `docs/data/precomputed/`.
 
 ## Run locally
 
 ```bash
-# serve the static site (no backend — files only)
+npm run serve                                  # python http.server on :5173 over docs/
+# or directly:
 python3 -m http.server 5173 --directory docs   # then open http://127.0.0.1:5173/
-# or, from the repo root:
-npm run serve
 ```
 
 ## Tests
 
 ```bash
 # real-browser end-to-end (Chromium via a static http.server host)
-npx playwright test
+npx playwright test            # (or: npm test)
 
-# Python: the offline export pipeline
+# Python: the offline export pipeline + model/scheduler
 ./.venv/bin/python -m pytest tests/ -q
 ```
 
