@@ -63,7 +63,13 @@
     </section>
 
     <div id="shape-bar" class="controls shape-bar">
-      <label>Dataset: <select id="shape-select" disabled></select></label>
+      <span class="ds-label" id="shape-label">Dataset:</span>
+      <div class="ds-select" id="shape-dropdown">
+        <button type="button" class="ds-trigger" id="shape-trigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="shape-label shape-value" disabled><span class="ds-value" id="shape-value"></span></button>
+        <ul class="ds-list" id="shape-list" role="listbox" aria-label="Dataset" tabindex="-1" hidden></ul>
+      </div>
+      <!-- value holder + change emitter behind the custom dropdown (hidden) -->
+      <select id="shape-select" hidden disabled></select>
       <span class="hint">applies to every panel below</span>
     </div>
 

@@ -51,17 +51,17 @@ test('stuck dataset bar fills the full viewport width (the side gutters too)', a
 
   const m = await bar.evaluate((el) => {
     const s = getComputedStyle(el);
-    return { boxShadow: s.boxShadow, clipPath: s.clipPath, rectW: el.getBoundingClientRect().width };
+    const before = getComputedStyle(el, "::before");
+    return { clipPath: s.clipPath, rectW: el.getBoundingClientRect().width, beforeBg: before.backgroundColor, beforeW: parseFloat(before.width) };
   });
   const vw = await page.evaluate(() => window.innerWidth);
 
   // the element box itself stays column-width — content is NOT stretched to the edges
   expect(m.rectW).toBeLessThan(vw);
-  // a black side fill (box-shadow) wider than the gutter on each side fills the gutters
-  expect(m.boxShadow).toMatch(/rgb\(0, 0, 0\)/);
-  const pxNums = [...m.boxShadow.matchAll(/(-?\d+(?:\.\d+)?)px/g)].map((x) => parseFloat(x[1]));
-  const spread = pxNums.length ? pxNums[pxNums.length - 1] : 0;
-  expect(spread).toBeGreaterThan((vw - m.rectW) / 2);
-  // clipped vertically so the fill does NOT bleed over the content below the bar
-  expect(m.clipPath).toMatch(/^inset\(/);
+  // full-bleed is done with a pseudo-element, NOT a clip-path: a clip-path here
+  // would also clip the dataset dropdown popup that overflows below the bar.
+  expect(m.clipPath).toBe('none');
+  // the ::before paints a full-viewport-width dark fill behind the bar's content
+  expect(m.beforeBg).toBe('rgb(0, 0, 0)');
+  expect(m.beforeW).toBeGreaterThanOrEqual(vw - 1);
 });

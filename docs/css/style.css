@@ -37,6 +37,11 @@
 
 * { box-sizing: border-box; }
 
+/* The stuck dataset bar's full-bleed pseudo-element is 100vw; clip horizontal
+   overflow so it never produces a sideways scrollbar. `clip` (not `hidden`)
+   keeps position:sticky working. */
+html { overflow-x: clip; }
+
 body {
   margin: 0;
   background: var(--light);
@@ -243,14 +248,73 @@ ol.references li::before { content: "[" counter(ref) "] "; }
   color: var(--light);
   padding-top: 1em;
   padding-bottom: 1em;
-  /* Full-bleed the dark bar across the whole viewport: the content column is
-     centered by the body's symmetric padding, leaving white gutters left/right.
-     A large box-shadow paints those gutters in the same dark color, and
-     clip-path clips it vertically to the bar's own height so the shadow does
-     not spill down over the content scrolling beneath. The element box (and
-     thus its content) stays exactly at column width. */
-  box-shadow: 0 0 0 100vmax var(--dark);
-  clip-path: inset(0 -100vmax);
+}
+/* Full-bleed the dark bar across the whole viewport: the content column is
+   centered by the body's symmetric padding, leaving white gutters left/right.
+   A pseudo-element painted behind the content (z-index:-1) fills the full
+   viewport width with the same dark color. We do NOT use box-shadow+clip-path
+   here: clip-path would clip the bar's vertical bounds and cut off the dataset
+   dropdown popup that overflows below the bar. The bar's own box (and thus its
+   content) stays exactly at column width. */
+.shape-bar.stuck::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background: var(--dark);
+  z-index: -1;
 }
 .shape-bar.stuck .hint { color: rgba(255, 255, 255, 0.72); }
-.shape-bar select { font-family: var(--font); font-size: 1em; padding: 0.15em 0.4em; }
+/* Custom dataset dropdown — replaces the OS-native <select> popup with a styled
+   trigger + listbox that matches the flat controls. The native <select> stays
+   in the DOM (hidden) as the value holder + change emitter for loadShape. */
+.ds-label { color: inherit; }
+.ds-select { position: relative; display: inline-block; }
+.ds-trigger {
+  font-family: var(--font); font-size: 1em; color: inherit;
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 0.6em;
+  min-width: 7em;
+  background: transparent;
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  padding: 0.2em 0.6em;
+  cursor: pointer;
+}
+/* caret drawn via a mask so it follows the text color (dark normally, light when stuck) */
+.ds-trigger::after {
+  content: ""; flex: none; width: 0.7em; height: 0.5em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1 6 6 11 1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1 6 6 11 1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.ds-trigger:hover:not(:disabled) { background: var(--reduce-14); }
+.ds-trigger:disabled { opacity: 0.5; cursor: default; }
+.ds-list {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
+  margin: 0; padding: 0.25em; list-style: none;
+  min-width: 100%;
+  background: var(--light);
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  max-height: 16em; overflow-y: auto;
+}
+.ds-list[hidden] { display: none; }
+.ds-option {
+  padding: 0.25em 0.6em; border-radius: 3px; cursor: pointer;
+  color: var(--text-dark); white-space: nowrap;
+}
+.ds-option:hover, .ds-option.active { background: var(--reduce-14); }
+.ds-option[aria-selected="true"] { color: var(--dark); }
+/* Stuck (dark) bar: the trigger's text + caret already follow currentColor
+   (white); give its border a light tint and hover so it reads on black. The
+   popup list stays light — it overlays the content below the bar. */
+.shape-bar.stuck .ds-trigger { border-color: rgba(255, 255, 255, 0.45); }
+.shape-bar.stuck .ds-trigger:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+/* the popup inverts to dark too, so the whole selector matches the bar */
+.shape-bar.stuck .ds-list { background: var(--dark); border-color: rgba(255, 255, 255, 0.45); }
+.shape-bar.stuck .ds-option { color: rgba(255, 255, 255, 0.82); }
+.shape-bar.stuck .ds-option:hover, .shape-bar.stuck .ds-option.active { background: rgba(255, 255, 255, 0.14); }
+.shape-bar.stuck .ds-option[aria-selected="true"] { color: var(--light); }

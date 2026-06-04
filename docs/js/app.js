@@ -358,20 +358,99 @@ async function boot() {
       setReverse(reverse, cleanData);
     }
 
-    // populate the shape selector
+    // populate the custom dataset dropdown — a styled listbox that proxies to
+    // the hidden <select>, which stays the value holder + change emitter so the
+    // loadShape wiring below is untouched.
     const sel = $("shape-select");
+    const trigger = $("shape-trigger");
+    const list = $("shape-list");
+    const valueEl = $("shape-value");
+    const dropdown = $("shape-dropdown");
     sel.innerHTML = "";
+    list.innerHTML = "";
     for (const s of meta.shapes) {
       const opt = document.createElement("option");
       opt.value = s;
       opt.textContent = s;
       sel.appendChild(opt);
+
+      const li = document.createElement("li");
+      li.className = "ds-option";
+      li.id = `ds-opt-${s}`;
+      li.setAttribute("role", "option");
+      li.dataset.value = s;
+      li.textContent = s;
+      list.appendChild(li);
     }
     const initial = meta.shapes.includes("dino") ? "dino" : meta.shapes[0];
-    sel.value = initial;
+
+    function setShapeValue(shape) {
+      sel.value = shape;
+      valueEl.textContent = shape;
+      for (const li of list.children) {
+        li.setAttribute("aria-selected", li.dataset.value === shape ? "true" : "false");
+      }
+    }
+    const opts = () => Array.from(list.children);
+    let activeIdx = -1;
+    function setActive(i) {
+      const o = opts();
+      if (!o.length) return;
+      activeIdx = Math.max(0, Math.min(o.length - 1, i));
+      o.forEach((li, k) => li.classList.toggle("active", k === activeIdx));
+      list.setAttribute("aria-activedescendant", o[activeIdx].id);
+      o[activeIdx].scrollIntoView({ block: "nearest" });
+    }
+    function openList() {
+      list.hidden = false;
+      trigger.setAttribute("aria-expanded", "true");
+      const cur = opts().findIndex((li) => li.dataset.value === sel.value);
+      setActive(cur >= 0 ? cur : 0);
+      list.focus();
+    }
+    function closeList(refocus = true) {
+      list.hidden = true;
+      trigger.setAttribute("aria-expanded", "false");
+      opts().forEach((li) => li.classList.remove("active"));
+      if (refocus) trigger.focus();
+    }
+    function chooseShape(shape) {
+      if (shape !== sel.value) {
+        setShapeValue(shape);
+        sel.dispatchEvent(new Event("change"));
+      }
+      closeList();
+    }
+
+    setShapeValue(initial);
     await loadShape(initial);
     sel.disabled = false;
+    trigger.disabled = false;
     sel.addEventListener("change", () => loadShape(sel.value));
+    // the trigger is a <button>: Space/Enter open via the native click; arrows open too
+    trigger.addEventListener("click", () => (list.hidden ? openList() : closeList()));
+    trigger.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); openList(); }
+    });
+    list.addEventListener("click", (e) => {
+      const li = e.target.closest(".ds-option");
+      if (li) chooseShape(li.dataset.value);
+    });
+    list.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); closeList(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); setActive(activeIdx + 1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); setActive(activeIdx - 1); }
+      else if (e.key === "Home") { e.preventDefault(); setActive(0); }
+      else if (e.key === "End") { e.preventDefault(); setActive(opts().length - 1); }
+      else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        const li = opts()[activeIdx];
+        if (li) chooseShape(li.dataset.value);
+      }
+    });
+    document.addEventListener("click", (e) => {
+      if (!list.hidden && !dropdown.contains(e.target)) closeList(false);
+    });
 
     initStickyState();
     document.body.setAttribute("data-app-state", "ready");

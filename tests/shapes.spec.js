@@ -22,7 +22,10 @@ test('shape selector switches the active shape across panels', async ({ page }) 
   const scatter = page.locator('#forward-endpoint');
   const before = await scatter.getAttribute('data-cloud-sum');
 
+  // switch shapes through the custom dropdown (the native <select> is hidden)
   const other = opts.find((o) => o !== 'dino');
-  await sel.selectOption(other);
+  await page.locator('#shape-trigger').click();
+  await page.locator(`#shape-list .ds-option[data-value="${other}"]`).click();
+  await expect(sel).toHaveValue(other);
   await expect.poll(async () => scatter.getAttribute('data-cloud-sum')).not.toBe(before);
 });
