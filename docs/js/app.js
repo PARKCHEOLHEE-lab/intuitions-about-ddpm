@@ -118,20 +118,29 @@ function initForward(view, alphasBar) {
 function initTraining(view) {
   const slider = $("snapshot-slider");
   let training = { snapshots: [[]], steps: [0] };
+  let gt = [];
 
   function renderAt(i) {
     renderScatter($("snapshots-canvas"), training.snapshots[i], {
       shape: `step ${training.steps[i]}`,
       view,
+      color: "#16a34a", // generated samples: green, matching reverse sampling
+      ghost: gt, // faint ground-truth overlay behind the generated samples
+      ghostColor: "#6d28d9", // gt overlay: faint purple
+      ghostAlpha: 0.22,
     });
     $("train-step").textContent = String(training.steps[i]);
   }
   slider.addEventListener("input", () => renderAt(parseInt(slider.value, 10) || 0));
   const stopPlay = attachPlay($("snapshot-play"), slider);
 
-  return function setTraining(tr) {
+  return function setTraining(tr, cleanData) {
     training = tr;
+    gt = cleanData;
     stopPlay();
+    // ground truth: the clean x0 the model learns to reproduce — static, the
+    // same clean scatter the forward panel shows (does not animate)
+    renderScatter($("train-groundtruth"), cleanData, { shape: "x0", view });
     slider.min = "0";
     slider.max = String(tr.snapshots.length - 1);
     slider.value = "0";
@@ -153,6 +162,7 @@ function initReverse(view, alphasBar) {
     renderForwardFrame($("reverse-traj"), reverse.trajectory, i, {
       view,
       color: "#16a34a",
+      ghostColor: "rgba(0,0,0,0)", // hide the faint overlapped noise-start ghost
       shape: `t=${t}`,
       trail: showTraj.checked,
       smooth: smooth.checked,
@@ -298,7 +308,7 @@ async function boot() {
       const { forward, training, reverse } = cache[shape];
       const cleanData = meta.data[shape];
       setForward(forward, cleanData);
-      setTraining(training);
+      setTraining(training, cleanData);
       setReverse(reverse, cleanData);
     }
 

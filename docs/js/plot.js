@@ -129,10 +129,28 @@ export function renderScatter(canvas, points, opts = {}) {
   const sy = (v) => H - syRaw(v); // flip y so +y points up
 
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = opts.color || "#6d28d9";
 
-  let checksum = 0;
   const r = opts.radius || 2;
+  // optional faint ground-truth underlay drawn BEHIND the main points, so you
+  // can see how well they overlap the target. Excluded from the checksum.
+  const ghost = opts.ghost || null;
+  const ghostColor = opts.ghostColor || "#9ca3af";
+  if (ghost && ghost.length) {
+    ctx.save();
+    ctx.globalAlpha = opts.ghostAlpha != null ? opts.ghostAlpha : 0.32;
+    ctx.fillStyle = ghostColor;
+    const gr = opts.ghostRadius || r;
+    for (let i = 0; i < ghost.length; i++) {
+      ctx.beginPath();
+      ctx.arc(sx(ghost[i][0]), sy(ghost[i][1]), gr, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  const fillColor = opts.color || "#6d28d9";
+  ctx.fillStyle = fillColor;
+  let checksum = 0;
   for (let i = 0; i < points.length; i++) {
     const x = points[i][0];
     const y = points[i][1];
@@ -146,6 +164,9 @@ export function renderScatter(canvas, points, opts = {}) {
   canvas.dataset.shape = opts.shape || "";
   canvas.dataset.pointCount = String(points.length);
   canvas.dataset.cloudSum = checksum.toFixed(4);
+  canvas.dataset.color = fillColor;
+  canvas.dataset.ghostCount = String(ghost ? ghost.length : 0);
+  canvas.dataset.ghostColor = ghost ? ghostColor : "";
   canvas.dataset.view = String(view);
 }
 
@@ -239,6 +260,9 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   // optional per-point colors (used by the modes figure to color each
   // trajectory by the mode it reaches); falls back to a single color.
   const colors = opts.colors || null;
+  // single trajectory color (drives BOTH the trail line and the dots), so each
+  // panel's trail matches its samples: forward purple, reverse green.
+  const baseColor = opts.color || "#6d28d9";
 
   // 1) faint ghost of the original (t=0) shape (or the x_T noise starts).
   const ghostColor = opts.ghostColor || "rgba(109,40,217,0.18)";
@@ -272,7 +296,7 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   // only the leading edge extends.
   const stride = doSmooth ? Math.max(1, Math.ceil((frames.length - 1) / (maxCtrl - 1))) : 1;
   for (let p = 0; showTrail && p < n; p++) {
-    ctx.strokeStyle = colors ? colors[p] : "#6d28d9";
+    ctx.strokeStyle = colors ? colors[p] : baseColor;
     let pts = [];
     if (doSmooth) {
       for (let s = 0; s <= index; s += stride) pts.push(frames[s][p]);
@@ -304,7 +328,6 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   // dots when opts.currentMarker === "cross".
   let checksum = 0;
   const r = opts.radius || 2;
-  const baseColor = opts.color || "#6d28d9";
   const asCross = opts.currentMarker === "cross";
   ctx.lineWidth = 1.8;
   for (let i = 0; i < n; i++) {
@@ -354,6 +377,7 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   canvas.dataset.trailHead = trailHead.toFixed(3);
   canvas.dataset.modeCount = String(colors ? new Set(colors).size : 1);
   canvas.dataset.ghostColor = ghostColor;
+  canvas.dataset.trailColor = colors ? "multi" : baseColor;
   canvas.dataset.backdropCount = String(backdropCount);
   canvas.dataset.solidStartCount = String(solidStarts.length);
   canvas.dataset.currentMarker = asCross ? "cross" : "dot";

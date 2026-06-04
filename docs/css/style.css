@@ -138,9 +138,11 @@ p.controls { margin-top: 1.6em; }
 canvas { max-width: 100%; height: auto; display: block; margin-inline: auto; }
 .two-panel canvas { width: 100%; }
 
-/* The intro transport figure is a 2-canvas overview, not a main panel — cap its
-   width so the two canvases stay modest, and center the capped block. */
-#modes-panel .two-panel { max-width: 46rem; margin-inline: auto; }
+/* The 2-canvas figures (intro transport + training ground-truth/snapshots) are
+   overviews, not main panels — cap their width to the same modest size and
+   center the capped block, so both render at matching canvas dimensions. */
+#modes-panel .two-panel,
+#train-panel .two-panel { max-width: 46rem; margin-inline: auto; }
 
 .kv { list-style: none; padding: 0; display: flex; gap: 1.25em; flex-wrap: wrap; }
 .kv code, code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }

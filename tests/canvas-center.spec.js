@@ -10,15 +10,15 @@ async function ready(page) {
 
 function centerX(b) { return b.x + b.width / 2; }
 
-// KR1: the standalone training canvas and the capped transport block are
-// centered within their container (center-x matches, within a small tolerance).
+// KR1: the capped training and transport (modes) two-panel blocks are centered
+// within their container column (center-x matches, within a small tolerance).
 test('KR1: canvases are horizontally centered in their column', async ({ page }) => {
   await ready(page);
 
-  // standalone training snapshot canvas vs its .viz container
-  const snap = await page.locator('#snapshots-canvas').boundingBox();
+  // the capped training two-panel block vs its .viz container
+  const train = await page.locator('#train-panel .two-panel').boundingBox();
   const viz = await page.locator('#train-panel .viz').boundingBox();
-  expect(Math.abs(centerX(snap) - centerX(viz))).toBeLessThanOrEqual(2);
+  expect(Math.abs(centerX(train) - centerX(viz))).toBeLessThanOrEqual(2);
 
   // the capped transport (modes) block vs the modes panel column
   const modes = await page.locator('#modes-panel .two-panel').boundingBox();
