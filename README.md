@@ -6,6 +6,12 @@ PyTorch, replayed in the browser as a static page.
 
 **Live demo →** https://parkcheolhee-lab.github.io/ddpm/
 
+![Sampling trajectories: noise → data](media/sampling-trajectories.png)
+*Reverse-sampling trajectories carrying noise (xₜ) into the data modes (x₀).*
+
+![Forward diffusion](media/forward-diffusion.png)
+*Forward diffusion — a dino dissolving into Gaussian noise, with the analytic marginal q(xₜ).*
+
 ## What it shows
 
 On 2D Datasaurus toy shapes (dino, star, circle, …):
@@ -21,21 +27,6 @@ The model is trained **offline in PyTorch** (`ddpm/src/`). `export_viz.py` then
 records every frame as **precomputed JSON** under `docs/data/precomputed/`, and
 the page (`docs/`) is a **pure client-side viewer** — plain JS replays the JSON
 on `<canvas>`. No server, no Python/ML in the browser.
-
-## Quick start
-
-```bash
-# view the site
-python3 -m http.server 5173 --directory docs   # → http://127.0.0.1:5173/
-
-# regenerate the precomputed data (retrains the model)
-pip install -r requirements.txt
-python ddpm/src/export_viz.py
-
-# tests
-pytest               # model + export pipeline
-npx playwright test  # the browser viewer
-```
 
 ## Layout
 
