@@ -55,6 +55,3 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-
-            if epoch % self.configs["visualize_interval"] == 0:
-                pass

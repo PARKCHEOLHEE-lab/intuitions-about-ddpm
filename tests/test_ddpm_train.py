@@ -37,7 +37,6 @@ def _config(n):
         "batch_size": n,  # full-batch → exactly one step, one q call, one forward call
         "epoch": 1,
         "learning_rate": 1e-3,
-        "visualize_interval": 10,
     }
 
 

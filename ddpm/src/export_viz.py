@@ -281,10 +281,10 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
 
     INLINE training loop (not the root ``Trainer``) — see module/report notes.
     The root ``Trainer`` hardcodes ``size=(batch_size, 1)`` when sampling ``t``,
-    which mismatches the final partial batch, and its ``visualize_interval`` hook
-    is epoch-based; we need exactly K snapshots at controlled optimizer-step
-    counts captured via the reverse sampler. This loop reuses model / scheduler /
-    dataset and only the snapshot scheduling is new.
+    which mismatches the final partial batch, and it has no snapshot mechanism;
+    we need exactly K snapshots at controlled optimizer-step counts captured via
+    the reverse sampler. This loop reuses model / scheduler / dataset and only the
+    snapshot scheduling is new.
 
     ``label_indices`` controls per-shape snapshotting:
       - ``None`` (default): sample ONLY label 0 at each checkpoint and return
