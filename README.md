@@ -1,4 +1,4 @@
-# ddpm — visual intuition for diffusion models
+# DDPM — Intuitions about Diffusion Models
 
 Diffusion models power most of today's image, video, and audio generators — yet
 how they actually work (slowly destroy data with noise, then train a network to
@@ -20,17 +20,8 @@ forward, reverse, and training processes is precomputed, and a dependency-free
 static page replays them — so you just open it and scrub through diffusion at
 your own pace, pausing on any timestep to see exactly what happens.
 
-**Live demo →** https://parkcheolhee-lab.github.io/ddpm/
+**[Intuitions about Diffusion Models](https://parkcheolhee-lab.github.io/ddpm/)**
 
 ![Sampling trajectories: noise → data](media/sampling-trajectories.png)
 
 ![Forward diffusion](media/forward-diffusion.png)
-
-## What it shows
-
-Four interactive views, each scrubbable timestep by timestep:
-
-- **Sampling trajectories** — on a few Gaussian modes, watch each path get carried from the noise prior into one of the data modes.
-- **Forward diffusion** — a shape dissolving into Gaussian noise, alongside the analytic marginal _q(xₜ)_ widening into a bell.
-- **Training the denoiser** — generated samples sharpening into the target shape as the network learns.
-- **Reverse sampling** — ancestral sampling walking pure noise back into the data.
