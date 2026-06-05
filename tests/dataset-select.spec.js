@@ -97,6 +97,30 @@ test('dropdown trigger + popup invert to dark on the stuck bar', async ({ page }
   expect(optColor).toMatch(/rgba?\(255, 255, 255/); // light option text on the dark popup
 });
 
+test('the popup keeps the native scrollbar and only flips to dark-mode when stuck', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await page.goto('/index.html');
+  await expect(page.locator('body')).toHaveAttribute('data-app-state', 'ready');
+
+  // We keep the NATIVE scrollbar (it has the browser's built-in hover); only its
+  // light/dark variant changes, via color-scheme. Custom ::-webkit-scrollbar
+  // styling is intentionally NOT used — it replaces the native bar and kills the
+  // native hover. color-scheme is computed-style readable, so this is testable
+  // directly (the actual scrollbar paint/hover is the browser's, not our CSS).
+  const list = page.locator('#shape-list');
+
+  // unstuck (white popup): light-mode native scrollbar
+  expect(await list.evaluate((el) => getComputedStyle(el).colorScheme)).toBe('light');
+
+  // scroll past the bar so it pins (stuck → dark popup): the native scrollbar
+  // flips to dark mode (light thumb on dark) and keeps its native :hover
+  const fY = await page.locator('#forward-panel').evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate((y) => window.scrollTo(0, y + 200), fY);
+  await page.waitForFunction(() => document.getElementById('shape-bar').classList.contains('stuck'));
+  await page.waitForTimeout(250);
+  expect(await list.evaluate((el) => getComputedStyle(el).colorScheme)).toBe('dark');
+});
+
 test('the selected option is not bold (same weight as the other options)', async ({ page }) => {
   await page.goto('/index.html');
   await expect(page.locator('body')).toHaveAttribute('data-app-state', 'ready');

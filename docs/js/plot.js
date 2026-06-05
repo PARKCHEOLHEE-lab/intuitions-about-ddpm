@@ -8,6 +8,16 @@ function mapper(size, pad, view = VIEW) {
   return (v) => pad + ((v + view) / (2 * view)) * (size - 2 * pad);
 }
 
+// Stroke an × marker (two diagonals) of arm radius r at pixel (px,py). The
+// caller sets strokeStyle/lineWidth beforehand; this owns its own path so the
+// glyph geometry lives in one place (endpoint crosses + trajectory markers).
+function strokeCross(ctx, px, py, r) {
+  ctx.beginPath();
+  ctx.moveTo(px - r, py - r); ctx.lineTo(px + r, py + r);
+  ctx.moveTo(px + r, py - r); ctx.lineTo(px - r, py + r);
+  ctx.stroke();
+}
+
 // Chaikin's corner-cutting subdivision: smooths a polyline by repeatedly
 // replacing each interior segment with its 1/4 and 3/4 points (cutting corners),
 // while pinning the two endpoints. Used to render the stochastic trajectory
@@ -58,6 +68,12 @@ export function diffusedMarginal1d(x0, axis, abarT, view) {
   return out.map((d) => d / mx);
 }
 
+// The faint ghost underlay (q(x0), the ORIGINAL distribution) is invariant while
+// scrubbing a shape — same x0/axis/ghostAbar/view every frame — so cache it per
+// canvas instead of recomputing its ~DENSITY_GRID×N Gaussian sum each tick. The
+// key fields are compared on every call; a shape switch (new x0) recomputes once.
+const _ghostCache = new WeakMap(); // canvas -> { x0, axis, abar, view, g }
+
 // Draw the q(x_t) marginal as a filled density curve in a fixed [-view, view]
 // frame (so it does not rescale while scrubbing). Reuses the canonical mapper().
 // Exposes data-peak-count (local maxima of the normalized curve) and
@@ -94,9 +110,13 @@ export function renderDensityCurve(canvas, x0, abarT, opts = {}) {
   // so the live curve reads against the shape it morphed from / toward.
   const hasGhost = opts.ghostAbar != null;
   if (hasGhost) {
-    const g = diffusedMarginal1d(x0, axis, opts.ghostAbar, view);
-    traceFill(g, "rgba(120,120,120,0.08)");
-    traceLine(g, "rgba(120,120,120,0.45)", 1, [4, 3]); // dashed = the original shape
+    let entry = _ghostCache.get(canvas);
+    if (!entry || entry.x0 !== x0 || entry.axis !== axis || entry.abar !== opts.ghostAbar || entry.view !== view) {
+      entry = { x0, axis, abar: opts.ghostAbar, view, g: diffusedMarginal1d(x0, axis, opts.ghostAbar, view) };
+      _ghostCache.set(canvas, entry);
+    }
+    traceFill(entry.g, "rgba(120,120,120,0.08)");
+    traceLine(entry.g, "rgba(120,120,120,0.45)", 1, [4, 3]); // dashed = the original shape
   }
 
   // live q(x_t) curve: filled area + thin (1px) outline
@@ -182,12 +202,6 @@ export function renderEndpoints(canvas, starts, ends, opts = {}) {
   const myRaw = mapper(H, pad, view);
   const sx = (v) => mx(v - cx);
   const sy = (v) => H - myRaw(v - cy);
-  const cross = (px, py, r) => {
-    ctx.beginPath();
-    ctx.moveTo(px - r, py - r); ctx.lineTo(px + r, py + r);
-    ctx.moveTo(px + r, py - r); ctx.lineTo(px - r, py + r);
-    ctx.stroke();
-  };
 
   ctx.clearRect(0, 0, W, H);
   ctx.lineWidth = 1.6;
@@ -199,7 +213,7 @@ export function renderEndpoints(canvas, starts, ends, opts = {}) {
   const colors = opts.colors || null;
   for (let i = 0; i < ends.length; i++) {
     ctx.strokeStyle = colors ? colors[i] : (opts.color || "#6d28d9");
-    cross(sx(ends[i][0]), sy(ends[i][1]), 3.5);
+    strokeCross(ctx, sx(ends[i][0]), sy(ends[i][1]), 3.5);
   }
 
   canvas.dataset.pointCount = String(ends.length);
@@ -248,14 +262,12 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
       ctx.fillStyle = grp.color;
       for (const [x, y] of grp.points) {
         const px = sx(x), py = sy(y);
-        ctx.beginPath();
         if (asDot) {
+          ctx.beginPath();
           ctx.arc(px, py, 2.4, 0, 2 * Math.PI);
           ctx.fill();
         } else {
-          ctx.moveTo(px - bxr, py - bxr); ctx.lineTo(px + bxr, py + bxr);
-          ctx.moveTo(px + bxr, py - bxr); ctx.lineTo(px - bxr, py + bxr);
-          ctx.stroke();
+          strokeCross(ctx, px, py, bxr);
         }
         backdropCount++;
       }
@@ -345,10 +357,7 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
     const px = sx(x), py = sy(y);
     if (asCross) {
       ctx.strokeStyle = c;
-      ctx.beginPath();
-      ctx.moveTo(px - r - 1.8, py - r - 1.8); ctx.lineTo(px + r + 1.8, py + r + 1.8);
-      ctx.moveTo(px + r + 1.8, py - r - 1.8); ctx.lineTo(px - r - 1.8, py + r + 1.8);
-      ctx.stroke();
+      strokeCross(ctx, px, py, r + 1.8);
     } else {
       ctx.fillStyle = c;
       ctx.beginPath();
@@ -370,14 +379,12 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   const ssr = 3.8;
   for (const [x, y] of solidStarts) {
     const px = sx(x), py = sy(y);
-    ctx.beginPath();
     if (ssMarker === "dot") {
+      ctx.beginPath();
       ctx.arc(px, py, ssr * 0.7, 0, 2 * Math.PI);
       ctx.fill();
     } else {
-      ctx.moveTo(px - ssr, py - ssr); ctx.lineTo(px + ssr, py + ssr);
-      ctx.moveTo(px + ssr, py - ssr); ctx.lineTo(px - ssr, py + ssr);
-      ctx.stroke();
+      strokeCross(ctx, px, py, ssr);
     }
   }
 

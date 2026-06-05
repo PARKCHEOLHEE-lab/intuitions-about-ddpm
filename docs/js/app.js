@@ -91,6 +91,16 @@ function attachPlay(button, slider) {
 // setter that swaps in a new shape's data and re-renders — so switching shapes
 // never re-binds listeners.
 
+// Wire a trajectory panel's standard scrub controls (slider + smooth/showTraj
+// toggles) to one re-render fn, so the three panels don't each repeat the same
+// three listeners. The render fn receives the current slider index.
+function wireScrub(slider, smooth, showTraj, render) {
+  const rerender = () => render(parseInt(slider.value, 10) || 0);
+  slider.addEventListener("input", rerender);
+  smooth.addEventListener("change", rerender);
+  showTraj.addEventListener("change", rerender);
+}
+
 // --- Forward viewer: scrub precomputed frames by index (timestep t) ----------
 function initForward(view, alphasBar) {
   const slider = $("t-slider");
@@ -106,17 +116,13 @@ function initForward(view, alphasBar) {
       shape: `t=${t}`,
       trail: showTraj.checked,
       smooth: smooth.checked,
-      smoothIterations: 3,
     });
     // analytic q(x_t) marginal of the x-coordinate, synced to the same timestep,
     // over a faint underlay of the original data distribution q(x0)
     renderDensityCurve($("forward-density"), x0, alphasBar[t], { view, ghostAbar: alphasBar[0] });
     $("t-value").textContent = String(t);
   }
-  const rerender = () => renderAt(parseInt(slider.value, 10) || 0);
-  slider.addEventListener("input", rerender);
-  smooth.addEventListener("change", rerender);
-  showTraj.addEventListener("change", rerender);
+  wireScrub(slider, smooth, showTraj, renderAt);
   const stopPlay = attachPlay($("t-play"), slider);
 
   return function setForward(fwd, cleanData) {
@@ -194,10 +200,7 @@ function initReverse(view, alphasBar) {
     renderDensityCurve($("reverse-density"), x0, alphasBar[t], { view, color: "#16a34a", fill: "rgba(22,163,74,0.16)", ghostAbar: alphasBar[0] });
     $("reverse-step").textContent = String(t);
   }
-  const rerender = () => renderStep(parseInt(slider.value, 10) || 0);
-  slider.addEventListener("input", rerender);
-  smooth.addEventListener("change", rerender);
-  showTraj.addEventListener("change", rerender);
+  wireScrub(slider, smooth, showTraj, renderStep);
   const stopPlay = attachPlay($("reverse-play"), slider);
 
   return function setReverse(rv, cleanData) {
@@ -291,7 +294,6 @@ function initModes(modes) {
       currentMarker: i === last ? "cross" : "dot",
       trail: showTraj.checked,
       smooth: smooth.checked,
-      smoothIterations: 3,
       shape: `t=${modes.timesteps[i]}`,
     });
     $("modes-step").textContent = String(modes.timesteps[i]);
@@ -299,10 +301,7 @@ function initModes(modes) {
 
   renderStep(last);
   slider.disabled = false;
-  const rerender = () => renderStep(parseInt(slider.value, 10));
-  slider.addEventListener("input", rerender);
-  smooth.addEventListener("change", rerender);
-  showTraj.addEventListener("change", rerender);
+  wireScrub(slider, smooth, showTraj, renderStep);
   attachPlay($("modes-play"), slider);
 }
 

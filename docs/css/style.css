@@ -241,8 +241,9 @@ ol.references li::before { content: "[" counter(ref) "] "; }
   background: var(--light);
   transition: background-color 0.15s, color 0.15s, padding 0.15s;
 }
-/* Pinned state (toggled by an IntersectionObserver sentinel): invert to a dark
-   bar with white text and double the vertical padding so it reads as a header. */
+/* Pinned state (toggled by a rAF-throttled scroll check in initStickyState):
+   invert to a dark bar with white text and double the vertical padding so it
+   reads as a header. */
 .shape-bar.stuck {
   background: var(--dark);
   color: var(--light);
@@ -300,6 +301,10 @@ ol.references li::before { content: "[" counter(ref) "] "; }
   border: 1px solid var(--reduce-30);
   border-radius: 4px;
   max-height: 16em; overflow-y: auto;
+  /* Keep the NATIVE scrollbar — it has the browser's built-in hover that custom
+     ::-webkit-scrollbar styling would replace and lose. color-scheme just picks
+     the light/dark variant per state (dark on the stuck bar, below). */
+  color-scheme: light;
 }
 .ds-list[hidden] { display: none; }
 .ds-option {
@@ -313,8 +318,15 @@ ol.references li::before { content: "[" counter(ref) "] "; }
    popup list stays light — it overlays the content below the bar. */
 .shape-bar.stuck .ds-trigger { border-color: rgba(255, 255, 255, 0.45); }
 .shape-bar.stuck .ds-trigger:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
-/* the popup inverts to dark too, so the whole selector matches the bar */
-.shape-bar.stuck .ds-list { background: var(--dark); border-color: rgba(255, 255, 255, 0.45); }
+/* the popup inverts to dark too, so the whole selector matches the bar. The
+   scrollbar flips to the browser's DARK-mode native scrollbar via color-scheme
+   (light thumb on dark) — which keeps the native :hover. Custom ::-webkit-scrollbar
+   styling is avoided on purpose: it replaces the native bar and loses the hover. */
+.shape-bar.stuck .ds-list {
+  background: var(--dark);
+  border-color: rgba(255, 255, 255, 0.45);
+  color-scheme: dark;
+}
 .shape-bar.stuck .ds-option { color: rgba(255, 255, 255, 0.82); }
 .shape-bar.stuck .ds-option:hover, .shape-bar.stuck .ds-option.active { background: rgba(255, 255, 255, 0.14); }
 .shape-bar.stuck .ds-option[aria-selected="true"] { color: var(--light); }

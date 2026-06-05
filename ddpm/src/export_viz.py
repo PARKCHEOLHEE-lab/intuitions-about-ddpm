@@ -441,21 +441,16 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
     return model, steps, snapshots
 
 
-def export_visualization(out_dir: str, config: dict) -> dict:
-    """Train + record + write the 4 precomputed JSON files; return them too."""
-
-    device = config.get("device", "cpu")
-    csv_path = config["csv_path"]
-    T = config["num_timesteps"]
-    seed = config.get("seed", 0)
-
-    os.makedirs(out_dir, exist_ok=True)
-    _seed_everything(seed)
-
-    # --- scheduler config consumed by root BetaScheduler / DDPM ---
-    model_config = {
-        "device": device,
-        "num_timesteps": T,
+def _base_model_config(config: dict, seed: int) -> dict:
+    """The model_config keys shared by every export entry point (consumed by
+    ``BetaScheduler`` / ``DDPM`` / ``train_with_snapshots``). Callers add the keys
+    that legitimately differ per export — ``cosine_s``, ``ema_decay``, the
+    ``snapshot_*`` / ``k_snapshots`` capture settings, and ``reverse_record_every``
+    — so the long common block lives in one place instead of three near-identical
+    copies that drift apart key by key."""
+    return {
+        "device": config.get("device", "cpu"),
+        "num_timesteps": config["num_timesteps"],
         "beta_start": config["beta_start"],
         "beta_end": config["beta_end"],
         "beta_schedule_type": config.get("beta_schedule_type", "linear"),
@@ -470,17 +465,34 @@ def export_visualization(out_dir: str, config: dict) -> dict:
         "denoiser_residual": config.get("denoiser_residual", True),
         "denoiser_output_dim": config.get("denoiser_output_dim", 2),
         "denoiser_activation": config["denoiser_activation"],
-        # carried for train_with_snapshots
         "epoch": config["epoch"],
         "batch_size": config["batch_size"],
         "learning_rate": config["learning_rate"],
         "lr_decay": config.get("lr_decay", True),
+        "seed": seed,
+    }
+
+
+def export_visualization(out_dir: str, config: dict) -> dict:
+    """Train + record + write the 4 precomputed JSON files; return them too."""
+
+    device = config.get("device", "cpu")
+    csv_path = config["csv_path"]
+    T = config["num_timesteps"]
+    seed = config.get("seed", 0)
+
+    os.makedirs(out_dir, exist_ok=True)
+    _seed_everything(seed)
+
+    # --- scheduler config consumed by root BetaScheduler / DDPM ---
+    model_config = _base_model_config(config, seed)
+    model_config.update({
+        # capture settings carried for train_with_snapshots
         "k_snapshots": config["k_snapshots"],
         "snapshot_dense_until": config.get("snapshot_dense_until", 0),
         "snapshot_coarse_every": config.get("snapshot_coarse_every"),
         "reverse_record_every": config["reverse_record_every"],
-        "seed": seed,
-    }
+    })
 
     dataset = Datasaurus(
         path=csv_path,
@@ -613,36 +625,16 @@ def export_all_shapes(out_dir: str, config: dict) -> dict:
     sd = dataset.xylabels[:, :2].std(dim=0)
 
     # --- scheduler config consumed by root BetaScheduler / DDPM ---
-    model_config = {
-        "device": device,
-        "num_timesteps": T,
-        "beta_start": config["beta_start"],
-        "beta_end": config["beta_end"],
-        "beta_schedule_type": config.get("beta_schedule_type", "linear"),
+    model_config = _base_model_config(config, seed)
+    model_config.update({
         "cosine_s": config.get("cosine_s", 0.008),
-        "label_embedding_dim": config["label_embedding_dim"],
-        "coordinate_embedding_dim": config["coordinate_embedding_dim"],
-        "coordinate_encoder_type": config["coordinate_encoder_type"],
-        "coordinate_encoder_scale": config.get("coordinate_encoder_scale", 25.0),
-        "time_embedding_dim": config["time_embedding_dim"],
-        "time_encoder_type": config["time_encoder_type"],
-        "num_denoiser_hidden_layers": config["num_denoiser_hidden_layers"],
-        "denoiser_hidden_dim": config["denoiser_hidden_dim"],
-        "denoiser_residual": config.get("denoiser_residual", True),
-        "denoiser_output_dim": config.get("denoiser_output_dim", 2),
-        "denoiser_activation": config["denoiser_activation"],
-        # carried for train_with_snapshots
-        "epoch": config["epoch"],
-        "batch_size": config["batch_size"],
-        "learning_rate": config["learning_rate"],
-        "lr_decay": config.get("lr_decay", True),
+        # capture settings carried for train_with_snapshots
         "k_snapshots": config["k_snapshots"],
         "snapshot_dense_until": config.get("snapshot_dense_until", 0),
         "snapshot_coarse_every": config.get("snapshot_coarse_every"),
         "reverse_record_every": record_every,
         "ema_decay": config.get("ema_decay"),
-        "seed": seed,
-    }
+    })
 
     scheduler = BetaScheduler(configs=model_config)
     model = DDPM(configs=model_config, labels=dataset.labels, beta_scheduler=scheduler)
@@ -736,8 +728,6 @@ def export_modes_figure(out_dir: str, config: dict) -> dict:
     and rounding as the main dino export — only the data and the per-trajectory
     coloring are new. Writes ``modes.json`` and returns it.
     """
-    from torch.utils.data import DataLoader  # noqa: F401  (reuse via train_with_snapshots)
-
     os.makedirs(out_dir, exist_ok=True)
     device = config.get("device", "cpu")
     T = config["num_timesteps"]
@@ -760,31 +750,11 @@ def export_modes_figure(out_dir: str, config: dict) -> dict:
     clip_val = float(data[:, :2].abs().max()) * 1.1
     clip_x0 = (-clip_val, clip_val)
 
-    model_config = {
-        "device": device,
-        "num_timesteps": T,
-        "beta_start": config["beta_start"],
-        "beta_end": config["beta_end"],
-        "beta_schedule_type": config.get("beta_schedule_type", "linear"),
-        "label_embedding_dim": config["label_embedding_dim"],
-        "coordinate_embedding_dim": config["coordinate_embedding_dim"],
-        "coordinate_encoder_type": config["coordinate_encoder_type"],
-        "coordinate_encoder_scale": config.get("coordinate_encoder_scale", 25.0),
-        "time_embedding_dim": config["time_embedding_dim"],
-        "time_encoder_type": config["time_encoder_type"],
-        "num_denoiser_hidden_layers": config["num_denoiser_hidden_layers"],
-        "denoiser_hidden_dim": config["denoiser_hidden_dim"],
-        "denoiser_residual": config.get("denoiser_residual", True),
-        "denoiser_output_dim": config.get("denoiser_output_dim", 2),
-        "denoiser_activation": config["denoiser_activation"],
-        "epoch": config["epoch"],
-        "batch_size": config["batch_size"],
-        "learning_rate": config["learning_rate"],
-        "lr_decay": config.get("lr_decay", True),
+    model_config = _base_model_config(config, seed)
+    model_config.update({
         "k_snapshots": 1,  # we only want the final trained model, not the panel
         "reverse_record_every": record_every,
-        "seed": seed,
-    }
+    })
 
     scheduler = BetaScheduler(configs=model_config)
     model = DDPM(configs=model_config, labels={"mode": 0}, beta_scheduler=scheduler)
