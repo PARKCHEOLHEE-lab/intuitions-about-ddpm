@@ -4,10 +4,11 @@ This module REUSES the root torch implementation:
   - ``DDPM`` and ``BetaScheduler`` from ``ddpm/src/ddpm.py``
   - ``Datasaurus`` from ``ddpm/src/dataset.py``
 
-It trains the "dino" datasaurus shape on CPU and writes four precomputed JSON
-files under ``docs/data/precomputed/`` consumed by the JS viewers. It does NOT
-reimplement the model / scheduler / dataset and does NOT use the numpy port in
-``docs/py/``.
+It trains ONE conditional DDPM over all Datasaurus shapes on CPU (plus a small
+Gaussian-modes model for the intro figure) and writes per-shape precomputed JSON
+(``forward_<shape>.json`` / ``reverse_<shape>.json`` / ``training_<shape>.json``)
+plus ``meta.json`` and ``modes.json`` under ``docs/data/precomputed/``, consumed
+by the JS viewers. It does NOT reimplement the model / scheduler / dataset.
 
 The root modules use bare imports (``from ddpm import ...``,
 ``from dataset import ...``), so ``ddpm/src`` is added to ``sys.path`` here.
@@ -89,49 +90,6 @@ def _seed_everything(seed: int) -> None:
 
     random.seed(seed)
     torch.manual_seed(seed)
-
-
-def _dino_template(csv_path: str, device: str) -> torch.Tensor:
-    """Return the clean, max-norm-normalized dino template (NO jitter).
-
-    Uses the exact same normalization Datasaurus applies: divide the (x, y) of
-    the dino rows by the maximum row-norm over those rows.
-    """
-
-    import pandas as pd
-
-    df = pd.read_csv(csv_path)
-    df = df[df["dataset"] == "dino"]
-    xy = torch.vstack(
-        [
-            torch.tensor(df.x.tolist(), dtype=torch.float32),
-            torch.tensor(df.y.tolist(), dtype=torch.float32),
-        ]
-    ).T
-    xy = xy / xy.norm(dim=1).max()
-    return xy.to(device)
-
-
-def _viz_dino_points(csv_path, n, mu, sd, device, jitter_scale, seed):
-    """Return ``n`` standardized dino points for the viewer (forward x0 + ghost).
-
-    The clean template only has 142 points; rendering a denser dino needs more
-    distinct points ON the dino shape. Rather than write a new sampler, reuse
-    Datasaurus' existing repeat+jitter sampling to densify the template to ``n``
-    points, then standardize with the SAME mu/sd the model was trained under so
-    the viewer's data/forward/reverse all live in one coordinate space.
-    """
-
-    _seed_everything(seed)
-    ds = Datasaurus(
-        path=csv_path,
-        num_points=n,
-        device=device,
-        labels_to_use=["dino"],
-        jitter_scale=jitter_scale,
-    )
-    xy = ds.xylabels[:, :2].to(device)  # (n, 2) in the same max-norm space
-    return (xy - mu) / sd
 
 
 def _round_points(points, nd=3):
@@ -473,120 +431,13 @@ def _base_model_config(config: dict, seed: int) -> dict:
     }
 
 
-def export_visualization(out_dir: str, config: dict) -> dict:
-    """Train + record + write the 4 precomputed JSON files; return them too."""
-
-    device = config.get("device", "cpu")
-    csv_path = config["csv_path"]
-    T = config["num_timesteps"]
-    seed = config.get("seed", 0)
-
-    os.makedirs(out_dir, exist_ok=True)
-    _seed_everything(seed)
-
-    # --- scheduler config consumed by root BetaScheduler / DDPM ---
-    model_config = _base_model_config(config, seed)
-    model_config.update({
-        # capture settings carried for train_with_snapshots
-        "k_snapshots": config["k_snapshots"],
-        "snapshot_dense_until": config.get("snapshot_dense_until", 0),
-        "snapshot_coarse_every": config.get("snapshot_coarse_every"),
-        "reverse_record_every": config["reverse_record_every"],
-    })
-
-    dataset = Datasaurus(
-        path=csv_path,
-        num_points=config["num_points"],
-        device=device,
-        labels_to_use=["dino"],
-        jitter_scale=config.get("jitter_scale", 1.0),
-    )
-
-    scheduler = BetaScheduler(configs=model_config)
-    model = DDPM(configs=model_config, labels=dataset.labels, beta_scheduler=scheduler)
-
-    # --- clean dino template (defines the mu/sd standardization space) ---
-    raw_template = _dino_template(csv_path, device)  # (142, 2), max-norm space
-
-    # Standardization at the export boundary: everything the model sees or
-    # produces lives in zero-mean/unit-var space. mu/sd are per-dim, computed
-    # from the clean dino template (matches the model's training standardization).
-    mu = raw_template.mean(dim=0)
-    sd = raw_template.std(dim=0)
-
-    # The rendered dino (meta "data" / ghost + forward x0) is densified to
-    # NUM_POINTS_VIZ distinct points via Datasaurus jitter, in the same space.
-    viz_points = _viz_dino_points(
-        csv_path, NUM_POINTS_VIZ, mu, sd, device, config.get("jitter_scale", 1.0), seed
-    )
-
-    # clip_denoised range: clamp the predicted x0 to the (standardized) data
-    # extent + 10% margin during ancestral sampling. Keeps even the untrained
-    # model's reverse sample bounded instead of diverging to ~±40.
-    clip_val = float(viz_points.abs().max()) * 1.1
-    clip_x0 = (-clip_val, clip_val)
-
-    # --- meta.json ---
-    meta = {
-        "label": config.get("label", "dino"),
-        "num_timesteps": T,
-        "num_points_viz": NUM_POINTS_VIZ,
-        "beta_start": config["beta_start"],
-        "beta_end": config["beta_end"],
-        "k_snapshots": config["k_snapshots"],
-        "mu": mu.detach().cpu().tolist(),
-        "sd": sd.detach().cpu().tolist(),
-        # one common half-extent for ALL viewer panels so the same dino renders
-        # at the same size everywhere. == clip range, so bounded reverse/training
-        # samples fit; the dino (~±2.6) fills ~90% and forward's t=T noise tail
-        # spills slightly off the edges (its spread is still clearly visible).
-        "view": clip_val,
-        "data": _round_points(viz_points.detach().cpu().tolist()),
-    }
-
-    # --- forward.json: step-by-step Markov chain (fresh noise each step), one
-    # frame per timestep t = 0..T-1, so the trajectory is a noisy walk ---
-    forward_frames = record_forward_trajectory(scheduler, viz_points, T, seed)
-    forward = {"ts": list(range(T)), "frames": forward_frames}
-
-    # --- training.json: K snapshots captured during training ---
-    model, steps, snapshots = train_with_snapshots(
-        model, dataset, scheduler, model_config, mu, sd, clip_x0=clip_x0
-    )
-    training = {"steps": steps, "snapshots": snapshots}
-
-    # --- reverse.json: one ancestral run recording every record_every steps ---
-    record_every = config["reverse_record_every"]
-    final, trajectory, rev_timesteps = record_reverse_trajectory(
-        model, scheduler, NUM_POINTS_VIZ, T, record_every, device, seed, clip_x0=clip_x0
-    )
-    reverse = {
-        # diffusion timestep t per recorded frame (T-1 noise -> 0 dino), so the
-        # viewer scrubs by t like the forward viewer (not an opaque frame index)
-        "timesteps": rev_timesteps,
-        "trajectory": trajectory,
-        "final": final,
-    }
-
-    result = {
-        "meta": meta,
-        "forward": forward,
-        "training": training,
-        "reverse": reverse,
-    }
-    for name, obj in result.items():
-        with open(os.path.join(out_dir, f"{name}.json"), "w") as f:
-            json.dump(obj, f)
-
-    return result
-
-
 def export_all_shapes(out_dir: str, config: dict) -> dict:
     """Train ONE conditional model on ALL selected Datasaurus shapes and export
     per-shape visualization data into ``out_dir``.
 
-    Mirrors ``export_visualization`` (model_config, scheduler, mu/sd standardization,
-    NUM_POINTS_VIZ densification, clip_denoised, _round_points) but:
+    Pipeline: build model_config + scheduler, standardize to global mu/sd,
+    densify each shape to NUM_POINTS_VIZ, clip_denoised, and round via
+    _round_points. Specifically it:
       - trains a single model conditioned on every shape (one shared coordinate
         space via global mu/sd over all shapes),
       - captures per-shape training snapshots in one pass via the extended

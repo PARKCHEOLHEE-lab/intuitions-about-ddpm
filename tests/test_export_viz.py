@@ -17,7 +17,6 @@ PRECOMPUTED_DIR = os.path.join(REPO_ROOT, "docs", "data", "precomputed")
 CSV_PATH = os.path.join(REPO_ROOT, "ddpm", "data", "datasaurus.csv")
 
 NUM_POINTS_VIZ = export_viz.NUM_POINTS_VIZ  # single source of truth
-K_SNAPSHOTS = 8
 
 
 def _is_pointlist(obj, n=NUM_POINTS_VIZ):
@@ -27,93 +26,6 @@ def _is_pointlist(obj, n=NUM_POINTS_VIZ):
         isinstance(p, list) and len(p) == 2 and all(isinstance(c, (int, float)) for c in p)
         for p in obj
     )
-
-
-def test_export_structure_tiny(tmp_path):
-    tiny_config = {
-        "csv_path": CSV_PATH,
-        "device": "cpu",
-        "label": "dino",
-        "num_timesteps": 20,
-        "beta_start": 0.0001,
-        "beta_end": 0.02,
-        "beta_schedule_type": "linear",
-        "epoch": 2,
-        "batch_size": 32,
-        "learning_rate": 1e-3,
-        "num_points": 128,
-        "label_embedding_dim": 8,
-        "coordinate_embedding_dim": 16,
-        "coordinate_encoder_type": "linear",
-        "time_embedding_dim": 16,
-        "time_encoder_type": "sinusoidal",
-        "num_denoiser_hidden_layers": 2,
-        "denoiser_hidden_dim": 32,
-        "denoiser_output_dim": 2,
-        "denoiser_activation": "GELU",
-        "k_snapshots": K_SNAPSHOTS,
-        "reverse_record_every": 5,
-        "seed": 0,
-    }
-
-    result = export_viz.export_visualization(str(tmp_path), tiny_config)
-
-    meta_p = tmp_path / "meta.json"
-    forward_p = tmp_path / "forward.json"
-    training_p = tmp_path / "training.json"
-    reverse_p = tmp_path / "reverse.json"
-
-    assert meta_p.exists()
-    assert forward_p.exists()
-    assert training_p.exists()
-    assert reverse_p.exists()
-
-    meta = json.loads(meta_p.read_text())
-    forward = json.loads(forward_p.read_text())
-    training = json.loads(training_p.read_text())
-    reverse = json.loads(reverse_p.read_text())
-
-    # meta
-    assert _is_pointlist(meta["data"])
-    assert meta["num_points_viz"] == NUM_POINTS_VIZ
-    assert meta["label"] == "dino"
-
-    # forward: ts strictly increasing, starts at 0; frames match ts; each 142x2
-    ts = forward["ts"]
-    assert ts[0] == 0
-    assert all(ts[i] < ts[i + 1] for i in range(len(ts) - 1))
-    frames = forward["frames"]
-    assert len(frames) == len(ts)
-    assert all(_is_pointlist(f) for f in frames)
-    # frames[0] (t=0) must equal the clean data
-    assert frames[0] == meta["data"]
-
-    # training: exactly K snapshots, each NUM_POINTS_VIZ x 2
-    snapshots = training["snapshots"]
-    assert len(snapshots) == K_SNAPSHOTS == 8
-    assert all(_is_pointlist(s) for s in snapshots)
-    assert len(training["steps"]) == K_SNAPSHOTS
-    # the first snapshot is the UNTRAINED model captured at optimizer step 0
-    steps = training["steps"]
-    assert steps[0] == 0
-    assert all(steps[i] < steps[i + 1] for i in range(len(steps) - 1))
-
-    # reverse: >=2 recorded steps, each NUM_POINTS_VIZ x 2, final NUM_POINTS_VIZ x 2
-    traj = reverse["trajectory"]
-    assert len(traj) >= 2
-    assert all(_is_pointlist(s) for s in traj)
-    assert _is_pointlist(reverse["final"])
-
-    # each recorded frame carries its diffusion timestep t, descending from near
-    # T-1 (pure noise) down to 0 (the dino) — so the viewer can show t, not "frame i"
-    tsr = reverse["timesteps"]
-    assert len(tsr) == len(traj)
-    assert tsr[0] == tiny_config["num_timesteps"] - 1  # first frame is the noisiest
-    assert tsr[-1] == 0  # final frame is x_0
-    assert all(tsr[i] > tsr[i + 1] for i in range(len(tsr) - 1))
-
-    # returned in-memory dict mirrors the written files
-    assert set(result.keys()) >= {"meta", "forward", "training", "reverse"}
 
 
 def test_modes_export_tiny(tmp_path):
