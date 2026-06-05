@@ -28,7 +28,7 @@ class Trainer:
 
     def train(self) -> None:
 
-        for epoch in range(1, self.configs["epoch"] + 1):
+        for _ in range(self.configs["epoch"]):
 
             for xylabels_batch in self.dataloader:
                 coordinates = xylabels_batch[:, :2]
