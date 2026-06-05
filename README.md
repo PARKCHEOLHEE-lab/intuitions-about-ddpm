@@ -1,9 +1,9 @@
-# DDPM — Intuitions about Diffusion Models
+# DDPM — [Intuitions about Diffusion Models](https://parkcheolhee-lab.github.io/ddpm/)
 
 Diffusion models power most of today's image, video, and audio generators — yet
 how they actually work (slowly destroy data with noise, then train a network to
-undo it step by step) tends to stay abstract, buried behind the math. **This repo
-turns that process into something you can watch.**
+undo it step by step) tends to stay abstract, buried behind the math. This repo
+turns that process into something you can watch.
 
 It strips diffusion down to its simplest form — 2D point clouds shaped like the
 Datasaurus dino, plus a dozen other shapes — so every step is visible on screen:
@@ -14,13 +14,11 @@ distribution spread out into a single Gaussian and then gather back into
 structure — the same intuition that underlies DDPMs, score-based models, and flow
 matching.
 
-The point is **understanding, not generation**. There is nothing to install and
-no model to download: a real PyTorch DDPM is trained offline, every frame of the
+The point is understanding, not generation. There is nothing to install and no
+model to download: a real PyTorch DDPM is trained offline, every frame of the
 forward, reverse, and training processes is precomputed, and a dependency-free
 static page replays them — so you just open it and scrub through diffusion at
 your own pace, pausing on any timestep to see exactly what happens.
-
-**[Intuitions about Diffusion Models](https://parkcheolhee-lab.github.io/ddpm/)**
 
 ![Sampling trajectories: noise → data](media/sampling-trajectories.png)
 
