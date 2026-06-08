@@ -1,4 +1,4 @@
-# [Intuitions about DDPM <img src="media/external-link.svg" width="20" height="20" alt="open in new tab" />](https://parkcheolhee-lab.github.io/intuitions-about-ddpm/)
+# Intuitions about DDPM [<img src="media/external-link.svg" width="20" height="20" alt="open in new tab" />](https://parkcheolhee-lab.github.io/intuitions-about-ddpm/)
 
 <p align="justify">
 Diffusion models power most of today's image, video, and audio generators — yet how they actually work (slowly destroy data with noise, then train a network to undo it step by step) tends to stay abstract, buried behind the math. This repo turns that process into something you can watch.
