@@ -14,6 +14,13 @@
   </header>
 
   <main>
+    <section id="diffusion-process-panel">
+      <h2>What does "diffusion" mean?</h2>
+      <p>The name comes from physics. The original diffusion model was inspired by <em>nonequilibrium thermodynamics</em>: slowly destroy structure in the data with a forward diffusion process, then learn a reverse process that restores it<a class="cite" href="#ref-1">[1]</a>. <strong>Diffusion</strong> itself is the everyday process where particles packed into one spot gradually spread out until they fill the whole space evenly — a drop of ink dissolving in water, or a puff of smoke thinning into a room.</p>
+      <p>Now zoom in on a <em>single</em> particle and photograph it at tiny time intervals. Step to step, it does not move in a straight line — it gets nudged in a random direction each instant. Those nudges are <strong>Gaussian</strong>: each step is drawn from a normal distribution $\mathcal{N}(\mu, \sigma^2)$. So the particle's path is a <em>Gaussian random walk</em>, and the cloud of many such particles is what we see spreading out.</p>
+      <p>Here is the key idea that makes generation possible: if every step is a known Gaussian, and we could figure out the distribution of each step, then we could run the whole walk <strong>backward</strong> — start from the fully spread-out noise and retrace the steps until the particles gather back into their original shape. That a diffusion can be run backward in time at all — its time-reversal is itself a diffusion — is a classical result<a class="cite" href="#ref-6">[6]</a>, and it is exactly the idea a diffusion model is built on.</p>
+    </section>
+
     <section id="intro-panel">
       <h2>What is a diffusion model?</h2>
       <p>A diffusion model learns to turn <strong>pure noise</strong> into <strong>data</strong> by reversing a gradual noising process<a class="cite" href="#ref-1">[1]</a><a class="cite" href="#ref-2">[2]</a>. It has two halves:</p>
@@ -21,13 +28,7 @@
         <li><strong>Forward</strong> (fixed, no learning) — repeatedly add a little Gaussian noise to a data point until, after $T$ steps, nothing is left but noise $\sim\mathcal{N}(0, I)$.</li>
         <li><strong>Reverse</strong> (learned) — a neural network is trained to undo one noising step at a time, so we can start from noise and walk back to a brand-new sample.</li>
       </ul>
-    </section>
-
-    <section id="diffusion-process-panel">
-      <h2>What does "diffusion" mean?</h2>
-      <p>The name comes from physics. The original diffusion model was inspired by <em>nonequilibrium thermodynamics</em>: slowly destroy structure in the data with a forward diffusion process, then learn a reverse process that restores it<a class="cite" href="#ref-1">[1]</a>. <strong>Diffusion</strong> itself is the everyday process where particles packed into one spot gradually spread out until they fill the whole space evenly — a drop of ink dissolving in water, or a puff of smoke thinning into a room.</p>
-      <p>Now zoom in on a <em>single</em> particle and photograph it at tiny time intervals. Step to step, it does not move in a straight line — it gets nudged in a random direction each instant. Those nudges are <strong>Gaussian</strong>: each step is drawn from a normal distribution $\mathcal{N}(\mu, \sigma^2)$. So the particle's path is a <em>Gaussian random walk</em>, and the cloud of many such particles is what we see spreading out.</p>
-      <p>Here is the key idea that makes generation possible: if every step is a known Gaussian, and we could figure out the distribution of each step, then we could run the whole walk <strong>backward</strong> — start from the fully spread-out noise and retrace the steps until the particles gather back into their original shape. That a diffusion can be run backward in time at all — its time-reversal is itself a diffusion — is a classical result<a class="cite" href="#ref-6">[6]</a>. A diffusion model is exactly that: the spreading is the fixed <em>forward</em> process, and a neural network learns to <em>reverse</em> it. You can watch this happen on real data in the panels below.</p>
+      <p>You can watch both halves happen on real data in the panels below.</p>
     </section>
 
     <section id="modes-panel">
