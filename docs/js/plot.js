@@ -8,6 +8,17 @@ function mapper(size, pad, view = VIEW) {
   return (v) => pad + ((v + view) / (2 * view)) * (size - 2 * pad);
 }
 
+// Build the data→pixel projector shared by every 2D renderer: sx/sy map data
+// coords into one fixed canvas frame (y flipped so +y points up), with an
+// optional center offset so off-origin content sits in the middle. Centralizing
+// it here keeps all panels on one framing convention instead of three copies.
+function projector(W, H, pad, view, center = [0, 0]) {
+  const [cx, cy] = center;
+  const mx = mapper(W, pad, view);
+  const my = mapper(H, pad, view);
+  return { sx: (v) => mx(v - cx), sy: (v) => H - my(v - cy) };
+}
+
 // Stroke an × marker (two diagonals) of arm radius r at pixel (px,py). The
 // caller sets strokeStyle/lineWidth beforehand; this owns its own path so the
 // glyph geometry lives in one place (endpoint crosses + trajectory markers).
@@ -144,9 +155,7 @@ export function renderScatter(canvas, points, opts = {}) {
   const H = canvas.height;
   const pad = 12;
   const view = opts.view || VIEW; // half-extent; pass a data-fit value to avoid clipping
-  const sx = mapper(W, pad, view);
-  const syRaw = mapper(H, pad, view);
-  const sy = (v) => H - syRaw(v); // flip y so +y points up
+  const { sx, sy } = projector(W, H, pad, view);
 
   ctx.clearRect(0, 0, W, H);
 
@@ -198,10 +207,7 @@ export function renderEndpoints(canvas, starts, ends, opts = {}) {
   const W = canvas.width, H = canvas.height, pad = 12;
   const view = opts.view || VIEW;
   const [cx, cy] = opts.center || [0, 0]; // shift so offset content is centered
-  const mx = mapper(W, pad, view);
-  const myRaw = mapper(H, pad, view);
-  const sx = (v) => mx(v - cx);
-  const sy = (v) => H - myRaw(v - cy);
+  const { sx, sy } = projector(W, H, pad, view, [cx, cy]);
 
   ctx.clearRect(0, 0, W, H);
   ctx.lineWidth = 1.6;
@@ -237,11 +243,8 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   const ctx = canvas.getContext("2d");
   const W = canvas.width, H = canvas.height, pad = 12;
   const view = opts.view || VIEW;
-  const [cx, cy] = opts.center || [0, 0]; // optional offset to frame shifted content
-  const sxm = mapper(W, pad, view);
-  const sym = mapper(H, pad, view);
-  const sx = (v) => sxm(v - cx);
-  const sy = (v) => H - sym(v - cy); // flip y so +y points up
+  // optional center offset to frame shifted content (e.g. the modes figure)
+  const { sx, sy } = projector(W, H, pad, view, opts.center || [0, 0]);
 
   ctx.clearRect(0, 0, W, H);
 

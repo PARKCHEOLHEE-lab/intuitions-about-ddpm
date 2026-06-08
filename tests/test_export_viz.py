@@ -516,7 +516,6 @@ def test_export_all_shapes_tiny(tmp_path):
         "denoiser_hidden_dim": 32,
         "denoiser_output_dim": 2,
         "denoiser_activation": "GELU",
-        "k_snapshots": 2,
         "snapshot_coarse_every": 10_000,  # large -> few snapshots
         "reverse_record_every": 5,
         "seed": 0,

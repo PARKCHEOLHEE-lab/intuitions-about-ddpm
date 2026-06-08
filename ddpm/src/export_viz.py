@@ -256,7 +256,6 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
     from torch.utils.data import DataLoader
 
     device = config["device"]
-    k_snapshots = config["k_snapshots"]
     record_every = config["reverse_record_every"]
     seed = config["seed"]
     T = config["num_timesteps"]
@@ -317,15 +316,9 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
         steps_set |= set(range(0, total_steps + 1, coarse_every))  # coarse elsewhere
         steps_set.add(total_steps)
         snapshot_steps = sorted(s for s in steps_set if s <= total_steps)
-    elif k_snapshots == 1:
-        snapshot_steps = [total_steps]
     else:
-        # legacy: K snapshots evenly spaced across [0, total_steps]
-        snapshot_steps = sorted(
-            {round(total_steps * i / (k_snapshots - 1)) for i in range(k_snapshots)}
-        )
-        while len(snapshot_steps) < k_snapshots:  # pad if dedup collapsed (tiny runs)
-            snapshot_steps.append(snapshot_steps[-1] + 1)
+        # every non-coarse caller wants only the final trained model
+        snapshot_steps = [total_steps]
 
     steps = []
     # flat list (label_indices None) or dict {label_idx: [per-checkpoint]}
@@ -403,9 +396,9 @@ def _base_model_config(config: dict, seed: int) -> dict:
     """The model_config keys shared by every export entry point (consumed by
     ``BetaScheduler`` / ``DDPM`` / ``train_with_snapshots``). Callers add the keys
     that legitimately differ per export — ``cosine_s``, ``ema_decay``, the
-    ``snapshot_*`` / ``k_snapshots`` capture settings, and ``reverse_record_every``
-    — so the long common block lives in one place instead of three near-identical
-    copies that drift apart key by key."""
+    ``snapshot_*`` capture settings, and ``reverse_record_every`` — so the long
+    common block lives in one place instead of three near-identical copies that
+    drift apart key by key."""
     return {
         "device": config.get("device", "cpu"),
         "num_timesteps": config["num_timesteps"],
@@ -480,7 +473,6 @@ def export_all_shapes(out_dir: str, config: dict) -> dict:
     model_config.update({
         "cosine_s": config.get("cosine_s", 0.008),
         # capture settings carried for train_with_snapshots
-        "k_snapshots": config["k_snapshots"],
         "snapshot_dense_until": config.get("snapshot_dense_until", 0),
         "snapshot_coarse_every": config.get("snapshot_coarse_every"),
         "reverse_record_every": record_every,
@@ -603,7 +595,7 @@ def export_modes_figure(out_dir: str, config: dict) -> dict:
 
     model_config = _base_model_config(config, seed)
     model_config.update({
-        "k_snapshots": 1,  # we only want the final trained model, not the panel
+        # no snapshot_coarse_every -> only the final trained model is captured
         "reverse_record_every": record_every,
     })
 
@@ -683,7 +675,6 @@ if __name__ == "__main__":
     cfg = {
         "csv_path": os.path.join(repo_root, "ddpm", "data", "datasaurus.csv"),
         "device": "cpu",
-        "label": "dino",
         "num_timesteps": 400,
         "beta_start": 0.0001,
         "beta_end": 0.02,
@@ -711,8 +702,6 @@ if __name__ == "__main__":
         # UNIFORM snapshots: record a checkpoint every 200 optimizer steps
         # (0, 200, 400, ... through the final step). dense_until=0 disables the
         # dense early region, so the interval is even throughout.
-        # k_snapshots is ignored when coarse_every is set.
-        "k_snapshots": 1,
         "snapshot_dense_until": 0,
         "snapshot_coarse_every": 200,
         "reverse_record_every": 1,  # record every diffusion timestep (t=399..0)
@@ -724,14 +713,12 @@ if __name__ == "__main__":
 
     # intro "trajectory transport" figure (a few Gaussian modes, colored paths)
     modes_cfg = {
-        **{k: cfg[k] for k in (
-            "device", "num_timesteps", "beta_start", "beta_end", "beta_schedule_type",
-            "batch_size", "learning_rate", "lr_decay", "label_embedding_dim",
-            "coordinate_embedding_dim", "coordinate_encoder_type", "coordinate_encoder_scale",
-            "time_embedding_dim", "time_encoder_type", "num_denoiser_hidden_layers",
-            "denoiser_hidden_dim", "denoiser_residual", "denoiser_output_dim",
-            "denoiser_activation", "seed",
-        )},
+        # inherit the dino model architecture verbatim, then override only the
+        # modes-specific knobs below. export_modes_figure routes this through
+        # _base_model_config, which copies just the model keys (and omits
+        # ema_decay / snapshot_* / shapes), so the extra dino-only keys are
+        # ignored and EMA stays off for this figure.
+        **cfg,
         "epoch": 1200,
         "num_modes": 4,
         "modes_points_per_mode": 300,
