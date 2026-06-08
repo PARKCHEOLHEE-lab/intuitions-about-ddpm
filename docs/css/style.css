@@ -1,0 +1,332 @@
+/* Styled to match PARKCHEOLHEE-lab.github.io's design system (see that repo's
+   DESIGN.md): PT Sans, flat surfaces (border + tint, no shadows/gradients),
+   em-based spacing, fluid type. Plot/data colors stay semantic. */
+
+/* Self-hosted PT Sans (vendored, no CDN) so the page stays fully offline. */
+@font-face {
+  font-family: "PT Sans";
+  src: local("PT Sans"), local("PTSans-Regular"), url("../fonts/PTSans-Regular.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PT Sans";
+  src: local("PT Sans Bold"), local("PTSans-Bold"), url("../fonts/PTSans-Bold.woff") format("woff");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* design tokens mirrored from _sass/index.sass */
+  --font: "PT Sans", -apple-system, "Helvetica Neue", "Segoe UI", "Roboto", sans-serif;
+  --dark: #000000;
+  --light: #ffffff;
+  --text-dark: rgb(70, 70, 70);
+  --link: #66a1ff;
+  --featured: #0011e3;
+  --bg-subtle: #f7f7f8;
+  --text-chat: #343541;
+  --divider: #e5e5e6;
+  --reduce-14: rgba(128, 128, 128, 0.14);
+  --reduce-30: rgba(128, 128, 128, 0.30);
+  --reduce-90: rgba(128, 128, 128, 0.90);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* The stuck dataset bar's full-bleed pseudo-element is 100vw; clip horizontal
+   overflow so it never produces a sideways scrollbar. `clip` (not `hidden`)
+   keeps position:sticky working. */
+html { overflow-x: clip; }
+
+body {
+  margin: 0;
+  background: var(--light);
+  color: var(--dark);
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: calc(0.7rem + 0.2vw);
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 1.5em clamp(1.5em, 20vw - 6em, 40vw - 17em);
+}
+
+/* The site keeps backgrounds flat even in dark mode. */
+@media (prefers-color-scheme: dark) {
+  body { background: var(--light); color: var(--dark); }
+}
+
+header h1 { font-size: 1.7em; font-weight: 600; margin: 0 0 0.1em; }
+.subtitle { margin: 0 0 1.5em; color: var(--text-dark); }
+
+h1, h2, h3, h4, h5, h6 { font-weight: 600; }
+
+main { margin-top: 1.5em; }
+
+/* Each concept is one section; figures may exceed the prose column. */
+section { margin: 0 0 3em; }
+section h2 { font-size: 1.3em; margin: 0 0 0.5em; }
+/* No per-element width caps: prose, callouts, controls and figures all share the
+   single page column (set by the body padding) so their left AND right edges line
+   up. A narrower cap here made the text ragged against the full-width figures. */
+section > p { margin: 0.6em 0; text-align: justify; }
+section > ul { padding-left: 1.2em; }
+section > ul li { margin: 0.3em 0; }
+
+b, strong, th { font-weight: 600; color: var(--text-dark); }
+
+a { color: var(--link); text-decoration: inherit; }
+a:hover { text-decoration: underline; }
+
+/* Display equations: room to breathe, scroll if too wide on mobile. */
+/* Block equations: top spacing as-is, extra breathing room below (about one
+   blank line) so the following prose isn't crowded. */
+p.eq { margin: 0.9em 0 2em; overflow-x: auto; overflow-y: hidden; }
+.katex { font-size: 1.05em; }
+.katex-display { margin: 0.4em 0; }
+
+/* Plain-language explanation tying the math to the interactive panel — styled
+   as ordinary body text, not a callout box. */
+.explain { margin: 0.9em 0 0; text-align: justify; }
+.hint { color: var(--text-dark); font-size: calc(0.6rem + 0.2vw); margin: 0.3em 0 0; }
+/* Figure caption hints read centered under their figures (the shape-bar's
+   span.hint note keeps its default left alignment). */
+p.hint { text-align: center; margin-bottom: 1.6em; }
+
+.controls { display: flex; gap: 1em; align-items: center; flex-wrap: wrap; margin: 0.5em 0; }
+/* Panel slider rows get a line break of space above, separating the controls
+   from the prose/equations that precede them (the shape-bar keeps its own
+   symmetric 1.5em spacing). */
+/* Panel control rows stay on ONE line (the slider shrinks to make room); the
+   options never wrap to a second line. The shape-bar (div.controls) is exempt —
+   it keeps wrapping its long descriptive note. */
+p.controls { margin-top: 1.6em; flex-wrap: nowrap; }
+.toggle { display: inline-flex; align-items: center; gap: 0.3em; }
+/* Toggle checkbox shares the play button's frame: a bordered rounded square
+   with a transparent fill and the same hover tint. A black check appears when
+   it is on (no colored accent). */
+.toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+  font-size: 0.85em;   /* match the play button's em scale → identical box size */
+  width: 1.9em;
+  height: 1.9em;
+  flex: none;          /* keep the square from shrinking in the flex row */
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.toggle input[type="checkbox"]:hover { background: var(--reduce-14); }
+.toggle input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 0.27em;
+  height: 0.5em;
+  border: solid #000;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+}
+
+/* Option A control row: a transport cluster (play + a grow-to-fill scrubber +
+   a live readout) grows to fill; a thin divider; then a lighter options
+   (toggles) cluster. On a narrow row the options wrap to a second line. */
+.controls .transport { display: flex; align-items: center; gap: 0.6em; flex: 1 1 auto; min-width: 0; }
+.controls .opts { display: flex; align-items: center; gap: 1em; flex: 0 0 auto; }
+.tval { font-family: var(--mono); font-size: 0.85em; color: var(--text-dark); white-space: nowrap; }
+/* The scrubber: thin track + link-colored thumb, grows to fill the transport. */
+.scrub { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 3px; background: var(--reduce-30); flex: 1 1 auto; min-width: 36px; outline: none; }
+.scrub::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--link); cursor: pointer; }
+.scrub::-moz-range-thumb { width: 14px; height: 14px; border: none; border-radius: 50%; background: var(--link); cursor: pointer; }
+.scrub:disabled { opacity: 0.5; cursor: default; }
+.scrub:disabled::-webkit-slider-thumb { background: var(--reduce-30); }
+
+/* Play button: flat, bordered, tints on hover; green ring while playing. */
+.play {
+  cursor: pointer; border: 1px solid var(--reduce-30); background: transparent; color: inherit;
+  border-radius: 4px; width: 1.9em; height: 1.9em; line-height: 1; font-size: 0.85em; padding: 0;
+  /* center the ▶/⏸ glyph in the box (block flow left it at the top) */
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.play:hover:not(:disabled) { background: var(--reduce-14); }
+.play:disabled { opacity: 0.4; cursor: default; }
+/* Playing highlight uses the shared control accent (the slider-thumb blue);
+   the ▶/⏸ icon swap is what signals play vs pause. */
+.play[data-playing="true"] { border-color: var(--link); color: var(--link); }
+/* The icon is a square SVG centered by the button's flex box; its shape is
+   centered within the viewBox, so the visible ink lands dead-center. */
+.play-icon { width: 1em; height: 1em; display: block; fill: currentColor; }
+
+/* Side-by-side canvas figures; each flexes so 2–3 panels share one row and
+   shrink to fit instead of overflowing, wrapping only on narrow screens. */
+/* Figures stay on ONE row (1×N) at every width — they shrink together rather
+   than collapsing into a ragged 2+1 wrap. nowrap + zero basis = equal columns. */
+.two-panel { display: flex; gap: 1.25em; flex-wrap: nowrap; align-items: flex-start; }
+/* Each canvas flexes to an equal share of the row. Per-canvas labels were
+   merged into one paper-style caption below the row (the panel's p.hint). */
+.two-panel figure { margin: 0; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; position: relative; }
+
+/* In-canvas legend overlaid on the plot's top-left (matplotlib-style): a colored
+   × per series + label, on a faint backdrop so it reads over the scatter. */
+.canvas-legend {
+  position: absolute; top: 0.4em; left: 0.4em; z-index: 1;
+  display: flex; flex-direction: column; gap: 0.05em;
+  font-size: calc(0.5rem + 0.18vw); color: var(--text-dark);
+  background: rgba(255, 255, 255, 0.65); padding: 0.15em 0.4em; border-radius: 3px;
+  pointer-events: none;
+}
+.canvas-legend .lg-row { display: flex; align-items: center; gap: 0.35em; }
+.canvas-legend .lg-mark { font-weight: 700; line-height: 1; }
+.canvas-legend .lg-label { font-style: italic; }
+.canvas-legend .lg-note { margin-left: 1.1em; font-style: italic; opacity: 0.75; }
+/* Single canvases keep their intrinsic size (shrinking on small screens);
+   only side-by-side figures stretch to fill their flex share. */
+/* Canvases are centered: any canvas narrower than its container sits in the
+   middle of the column rather than hugging the left edge. */
+canvas { max-width: 100%; height: auto; display: block; margin-inline: auto; }
+.two-panel canvas { width: 100%; }
+
+/* The 2-canvas figures (intro transport + training ground-truth/snapshots) are
+   overviews, not main panels — cap their width to the same modest size and
+   center the capped block, so both render at matching canvas dimensions. */
+#modes-panel .two-panel,
+#train-panel .two-panel { max-width: 46rem; margin-inline: auto; }
+
+code { font-family: var(--mono); background: var(--bg-subtle); padding: 0.05em 0.3em; border-radius: 3px; }
+
+hr { border: none; border-top: 1px solid var(--divider); margin: 2em 0; }
+
+/* Inline citation links: small bracketed superscript references. */
+a.cite { color: var(--link); text-decoration: none; font-size: 0.85em; vertical-align: super; line-height: 0; padding: 0 0.05em; }
+a.cite:hover { text-decoration: underline; }
+
+/* References list rendered as [1], [2], … with a hanging indent. */
+ol.references { list-style: none; counter-reset: ref; padding-left: 0; margin: 0.6em 0; }
+ol.references li { counter-increment: ref; padding-left: 2.4em; text-indent: -2.4em; margin: 0.45em 0; color: var(--text-dark); font-size: calc(0.66rem + 0.2vw); }
+ol.references li::before { content: "[" counter(ref) "] "; }
+
+/* Error surface: populated only when a data fetch fails (no silent fallback). */
+#error {
+  margin-top: 1em;
+  padding: 0.75em 1em;
+  background: var(--bg-subtle);
+  border: 1px solid var(--reduce-30);
+  border-left: 3px solid #b91c1c;
+  border-radius: 0 4px 4px 0;
+  color: #b91c1c;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: calc(0.6rem + 0.2vw);
+}
+
+/* Global dataset selector: a bar pinned to the top of the viewport so the shape
+   can be changed from any panel while scrolling. Opaque background so content
+   scrolls cleanly underneath (no rule line). */
+.shape-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  gap: 0.75em;
+  margin: 1em 0;
+  padding: 0.5em 0;
+  background: var(--light);
+  transition: background-color 0.15s, color 0.15s, padding 0.15s;
+}
+/* Pinned state (toggled by a rAF-throttled scroll check in initStickyState):
+   invert to a dark bar with white text and double the vertical padding so it
+   reads as a header. */
+.shape-bar.stuck {
+  background: var(--dark);
+  color: var(--light);
+  padding-top: 1em;
+  padding-bottom: 1em;
+}
+/* Full-bleed the dark bar across the whole viewport: the content column is
+   centered by the body's symmetric padding, leaving white gutters left/right.
+   A pseudo-element painted behind the content (z-index:-1) fills the full
+   viewport width with the same dark color. We do NOT use box-shadow+clip-path
+   here: clip-path would clip the bar's vertical bounds and cut off the dataset
+   dropdown popup that overflows below the bar. The bar's own box (and thus its
+   content) stays exactly at column width. */
+.shape-bar.stuck::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 100vw;
+  transform: translateX(-50%);
+  background: var(--dark);
+  z-index: -1;
+}
+.shape-bar.stuck .hint { color: rgba(255, 255, 255, 0.72); }
+/* Custom dataset dropdown — replaces the OS-native <select> popup with a styled
+   trigger + listbox that matches the flat controls. The native <select> stays
+   in the DOM (hidden) as the value holder + change emitter for loadShape. */
+.ds-label { color: inherit; }
+.ds-select { position: relative; display: inline-block; }
+.ds-trigger {
+  font-family: var(--font); font-size: 1em; color: inherit;
+  display: inline-flex; align-items: center; justify-content: space-between; gap: 0.6em;
+  min-width: 7em;
+  background: transparent;
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  padding: 0.2em 0.6em;
+  cursor: pointer;
+}
+/* caret drawn via a mask so it follows the text color (dark normally, light when stuck) */
+.ds-trigger::after {
+  content: ""; flex: none; width: 0.7em; height: 0.5em;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1 6 6 11 1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1 6 6 11 1' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.ds-trigger:hover:not(:disabled) { background: var(--reduce-14); }
+.ds-trigger:disabled { opacity: 0.5; cursor: default; }
+.ds-list {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 20;
+  margin: 0; padding: 0.25em; list-style: none;
+  min-width: 100%;
+  background: var(--light);
+  border: 1px solid var(--reduce-30);
+  border-radius: 4px;
+  max-height: 16em; overflow-y: auto;
+  /* Keep the NATIVE scrollbar — it has the browser's built-in hover that custom
+     ::-webkit-scrollbar styling would replace and lose. color-scheme just picks
+     the light/dark variant per state (dark on the stuck bar, below). */
+  color-scheme: light;
+}
+.ds-list[hidden] { display: none; }
+.ds-option {
+  padding: 0.25em 0.6em; border-radius: 3px; cursor: pointer;
+  color: var(--text-dark); white-space: nowrap;
+}
+.ds-option:hover, .ds-option.active { background: var(--reduce-14); }
+.ds-option[aria-selected="true"] { color: var(--dark); }
+/* Stuck (dark) bar: the trigger's text + caret already follow currentColor
+   (white); give its border a light tint and hover so it reads on black. The
+   popup list stays light — it overlays the content below the bar. */
+.shape-bar.stuck .ds-trigger { border-color: rgba(255, 255, 255, 0.45); }
+.shape-bar.stuck .ds-trigger:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); }
+/* the popup inverts to dark too, so the whole selector matches the bar. The
+   scrollbar flips to the browser's DARK-mode native scrollbar via color-scheme
+   (light thumb on dark) — which keeps the native :hover. Custom ::-webkit-scrollbar
+   styling is avoided on purpose: it replaces the native bar and loses the hover. */
+.shape-bar.stuck .ds-list {
+  background: var(--dark);
+  border-color: rgba(255, 255, 255, 0.45);
+  color-scheme: dark;
+}
+.shape-bar.stuck .ds-option { color: rgba(255, 255, 255, 0.82); }
+.shape-bar.stuck .ds-option:hover, .shape-bar.stuck .ds-option.active { background: rgba(255, 255, 255, 0.14); }
+.shape-bar.stuck .ds-option[aria-selected="true"] { color: var(--light); }

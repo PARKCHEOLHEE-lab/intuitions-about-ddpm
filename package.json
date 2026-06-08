@@ -1,0 +1,13 @@
+{
+  "name": "intuitions-about-ddpm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Interactive static page that teaches diffusion models — a DDPM trained offline in PyTorch, replayed in the browser from precomputed JSON (pure JS, no server).",
+  "scripts": {
+    "serve": "python3 -m http.server 5173 --directory docs",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0"
+  }
+}

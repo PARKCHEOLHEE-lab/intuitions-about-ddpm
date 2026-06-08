@@ -3,7 +3,7 @@ import torch
 import pandas as pd
 
 from typing import List
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 
 class Datasaurus(Dataset):
@@ -11,22 +11,26 @@ class Datasaurus(Dataset):
     """
         
     def __init__(
-        self, 
-        path: str, 
-        num_points: int = 1000, 
+        self,
+        path: str,
+        num_points: int = 1000,
         device: str = "cuda",
         labels_to_use: List[str] = None,
+        jitter_scale: float = 1.0,
     ) -> None:
-    
+
         super().__init__()
-        
+
         assert os.path.exists(path)
         assert isinstance(num_points, int) and num_points > 0
-        
+
         self.path = path
         self.num_points = num_points
         self.device = device
         self.labels_to_use = labels_to_use
+        # scales the per-shape jitter; < 1 keeps the template sharp (useful when
+        # the goal is to reproduce the exact point set, not a broad density)
+        self.jitter_scale = jitter_scale
         
         self.labels = {
             "bullseye":None,
@@ -66,8 +70,8 @@ class Datasaurus(Dataset):
         # normalize using max norm
         templates[:, :2] = templates[:, :2] / templates[:, :2].norm(dim=1).max()
         
-        jitter_x_std = templates[:, 0].var() * 0.25
-        jitter_y_std = templates[:, 1].var() * 0.25
+        jitter_x_std = templates[:, 0].var() * 0.25 * self.jitter_scale
+        jitter_y_std = templates[:, 1].var() * 0.25 * self.jitter_scale
         
         xylabels = []
         for label in self.labels.values():
