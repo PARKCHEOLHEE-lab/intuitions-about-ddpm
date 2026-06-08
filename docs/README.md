@@ -1,4 +1,4 @@
-# Intuitions about Diffusion Models — interactive page
+# Intuitions about DDPM — interactive page
 
 A **static** site that teaches diffusion models (DDPM) on the 2D
 **Datasaurus** toy shapes. The model is trained **offline in PyTorch**; an
