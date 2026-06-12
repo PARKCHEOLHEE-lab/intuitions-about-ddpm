@@ -133,8 +133,11 @@
             <figure>
               <canvas id="snapshots-canvas" width="420" height="420" aria-label="generated samples snapshot"></canvas>
             </figure>
+            <figure>
+              <canvas id="train-loss" width="420" height="420" aria-label="training loss convergence"></canvas>
+            </figure>
           </div>
-          <p class="hint"><br>Training the denoiser. <em>(Left)</em> the ground-truth data $x_0$ the model learns to reproduce. <em>(Right)</em> samples it generates from noise after the given number of optimizer steps.</p>
+          <p class="hint"><br>Training the denoiser. <em>(Left)</em> the ground-truth data $x_0$ the model learns to reproduce. <em>(Middle)</em> samples it generates from noise after the given number of optimizer steps. <em>(Right)</em> the training loss $\mathcal{L}$ (log scale) over those steps — one global curve, since a single model is trained on every shape — marked at the current snapshot.</p>
         </div>
         <p class="explain" id="train-explain">The denoiser is trained to predict the noise added at each step. Each snapshot shows points it generates from pure noise after a given number of training steps — a shapeless blob early on, sharpening into a dino as training proceeds. The early region is sampled densely (every step) because the shape forms fastest there.</p>
       </div>

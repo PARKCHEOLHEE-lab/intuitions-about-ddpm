@@ -251,6 +251,10 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
       - a list of label indices: sample EACH label at each checkpoint (respecting
         the EMA weight swap) and return ``snapshots`` as a ``dict``
         ``{label_idx: [snapshot_per_checkpoint, ...]}``. ``steps`` is shared.
+
+    Always returns a fourth value ``losses``: the global per-checkpoint training
+    loss (mean denoising MSE since the previous checkpoint; the step-0 entry is
+    the untrained model's first-batch loss), index-aligned to ``steps``.
     """
 
     from torch.utils.data import DataLoader
@@ -326,6 +330,22 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
     global_step = 0
     pending = list(snapshot_steps)
 
+    # Global training loss per checkpoint, index-aligned to `steps`, so the viewer
+    # can draw a convergence curve scrubbed by the same slider. losses[k>0] is the
+    # MEAN per-step denoising MSE over the interval since the previous checkpoint
+    # (a smooth convergence reading); losses[0] (the untrained step-0 snapshot) is
+    # the first batch's loss, computed before any optimizer step.
+    step0_is_checkpoint = bool(snapshot_steps) and snapshot_steps[0] == 0
+    losses = []
+    loss_buf = []
+    last_loss = None
+
+    def _record_loss():
+        # mean per-step loss since the last checkpoint; if no step elapsed (e.g. a
+        # rounding-overshoot tail checkpoint) reuse the most recent per-step loss.
+        losses.append(sum(loss_buf) / len(loss_buf) if loss_buf else (last_loss or 0.0))
+        loss_buf.clear()
+
     def _record_snapshot():
         out = _sample()
         if label_indices is None:
@@ -364,6 +384,14 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
             loss = torch.nn.functional.mse_loss(
                 noise_predicted, noise
             )
+            # record this step's loss BEFORE the update, so it reflects the model
+            # state being snapshotted. The first computed loss is the untrained
+            # model's loss -> it fills the step-0 checkpoint's entry.
+            last_loss = float(loss.item())
+            if step0_is_checkpoint and not losses:
+                losses.append(last_loss)  # losses[0] = untrained loss
+            else:
+                loss_buf.append(last_loss)
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
@@ -377,19 +405,21 @@ def train_with_snapshots(model, dataset, scheduler, config, mu, sd, clip_x0=None
                 target = pending.pop(0)
                 steps.append(target)
                 _record_snapshot()
+                _record_loss()
 
     # capture any remaining checkpoints (e.g. when total_steps rounding overshot)
     while pending:
         target = pending.pop(0)
         steps.append(target)
         _record_snapshot()
+        _record_loss()
 
     # bake EMA weights into the returned model so downstream sampling (reverse.json)
     # also benefits from the averaged weights.
     if ema is not None:
         model.load_state_dict(ema)
 
-    return model, steps, snapshots
+    return model, steps, snapshots, losses
 
 
 def _base_model_config(config: dict, seed: int) -> dict:
@@ -505,10 +535,20 @@ def export_all_shapes(out_dir: str, config: dict) -> dict:
 
     # --- train ONE conditional model, snapshotting EVERY shape per checkpoint ---
     label_indices = [dataset.labels[s] for s in shape_order]
-    model, steps, snaps_by_shape = train_with_snapshots(
+    model, steps, snaps_by_shape, losses = train_with_snapshots(
         model, dataset, scheduler, model_config, mu, sd,
         clip_x0=clip_x0, label_indices=label_indices,
     )
+
+    # Step 0 (untrained) is displayed as the x_T ~ N(0,I) prior the sampler starts
+    # from, not the untrained model's clipped reverse output (which fills the data
+    # box and reads as a confusing square). The prior is label-independent, so one
+    # SHARED cloud; a dedicated generator leaves the global RNG stream — and thus
+    # every other snapshot / trajectory — byte-identical to before this override.
+    step0_noise = None
+    if steps and steps[0] == 0:
+        _g = torch.Generator(device=device).manual_seed(seed)
+        step0_noise = _round_points(torch.randn(NUM_POINTS_VIZ, 2, generator=_g, device=device).tolist())
 
     # --- per-shape files ---
     forward_by_shape = {}
@@ -526,7 +566,11 @@ def export_all_shapes(out_dir: str, config: dict) -> dict:
         )
         reverse = {"timesteps": rev_timesteps, "trajectory": trajectory, "final": final}
 
-        training = {"steps": steps, "snapshots": snaps_by_shape[idx]}
+        # `losses` is GLOBAL (one conditional model) — the same series is written
+        # into every per-shape file, index-aligned to the shared `steps`.
+        training = {"steps": steps, "snapshots": snaps_by_shape[idx], "losses": losses}
+        if step0_noise is not None:
+            training["snapshots"][0] = step0_noise  # untrained step 0 -> the x_T prior
 
         with open(os.path.join(out_dir, f"forward_{shape}.json"), "w") as f:
             json.dump(forward, f)
@@ -601,7 +645,7 @@ def export_modes_figure(out_dir: str, config: dict) -> dict:
 
     scheduler = BetaScheduler(configs=model_config)
     model = DDPM(configs=model_config, labels={"mode": 0}, beta_scheduler=scheduler)
-    model, _, _ = train_with_snapshots(model, data, scheduler, model_config, mu, sd, clip_x0=clip_x0)
+    model, _, _, _ = train_with_snapshots(model, data, scheduler, model_config, mu, sd, clip_x0=clip_x0)
 
     # x_T noise cloud (the red prior samples, N(0, I)); the first n_starts of them
     # are the FIXED starts we trace, so the selected starts belong to the cloud.
@@ -670,9 +714,15 @@ def export_modes_figure(out_dir: str, config: dict) -> dict:
     return modes
 
 
-if __name__ == "__main__":
-    repo_root = os.path.abspath(os.path.join(_SRC_DIR, "..", ".."))
-    cfg = {
+def default_export_config(repo_root: str) -> dict:
+    """The production export config (T=400, all 10 shapes, EMA, cosine schedule).
+
+    Module-level so both ``__main__`` and offline regeneration share ONE source —
+    regenerating ``training_*.json`` (e.g. to add the per-checkpoint ``losses``)
+    must use the exact config that produced the committed snapshots, not a copy
+    that can drift.
+    """
+    return {
         "csv_path": os.path.join(repo_root, "ddpm", "data", "datasaurus.csv"),
         "device": "cpu",
         "num_timesteps": 400,
@@ -708,6 +758,11 @@ if __name__ == "__main__":
         "shapes": None,  # None == all mapped Datasaurus shapes
         "seed": 0,
     }
+
+
+if __name__ == "__main__":
+    repo_root = os.path.abspath(os.path.join(_SRC_DIR, "..", ".."))
+    cfg = default_export_config(repo_root)
     out = os.path.join(repo_root, "docs", "data", "precomputed")
     result = export_all_shapes(out, cfg)
 
