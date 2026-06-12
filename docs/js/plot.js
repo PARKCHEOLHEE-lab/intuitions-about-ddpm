@@ -155,7 +155,9 @@ export function renderScatter(canvas, points, opts = {}) {
   const H = canvas.height;
   const pad = 12;
   const view = opts.view || VIEW; // half-extent; pass a data-fit value to avoid clipping
-  const { sx, sy } = projector(W, H, pad, view);
+  // optional center offset (data coords): a positive x shifts the whole cloud
+  // left, so a panel can nudge off-balance content without changing its scale.
+  const { sx, sy } = projector(W, H, pad, view, opts.center || [0, 0]);
 
   ctx.clearRect(0, 0, W, H);
 
@@ -410,4 +412,74 @@ export function renderForwardFrame(canvas, frames, index, opts = {}) {
   canvas.dataset.solidStartCount = String(solidStarts.length);
   canvas.dataset.solidStartMarker = ssMarker;
   canvas.dataset.currentMarker = asCross ? "cross" : "dot";
+}
+
+// Loss-convergence panel: the GLOBAL per-checkpoint training loss drawn as a
+// step->loss curve, with a marker at the snapshot the slider currently selects.
+// Unlike renderDensityCurve (a self-normalized density in a fixed data frame),
+// this is an absolute-scale time series on a LOG y-axis, so the multi-order
+// descent from the untrained model reads as convergence — hence its own
+// renderer rather than a mode bolted onto the density curve. `losses`/`steps`
+// are index-aligned (one entry per training snapshot); `index` is the slider
+// position shared with the samples panel.
+export function renderLossCurve(canvas, losses, steps, index, opts = {}) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const padL = 12, padR = 12, padT = 12, padB = 12; // uniform frame (no axis labels)
+  ctx.clearRect(0, 0, W, H);
+
+  const n = losses.length;
+  const i = Math.max(0, Math.min(n - 1, index));
+  // x: checkpoint index -> pixel (uniform across checkpoints, matching the slider)
+  const xOf = (k) => padL + (n <= 1 ? 0 : (k / (n - 1)) * (W - padL - padR));
+  // y: loss on a LOG scale (absolute, not self-normalized) so the early high loss
+  // and the late low loss are both legible. lo/hi from the positive finite losses.
+  const pos = losses.filter((v) => v > 0 && isFinite(v));
+  const lo = pos.length ? Math.min(...pos) : 1;
+  const hi = pos.length ? Math.max(...pos) : 1;
+  const lhi = Math.log(hi), llo = Math.log(lo);
+  const span = lhi - llo || 1; // guard a flat curve
+  // high loss near the top (small y), low loss near the bottom (large y)
+  const yOf = (v) => padT + ((lhi - Math.log(Math.max(v, lo))) / span) * (H - padT - padB);
+
+  const curveColor = opts.color || "#6d28d9"; // page accent (matches density curve)
+  const markColor = opts.markerColor || "#16a34a"; // ties to the green samples panel
+
+  // axes: a faint L (left + bottom)
+  ctx.strokeStyle = "rgba(120,120,120,0.35)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padL, padT); ctx.lineTo(padL, H - padB); ctx.lineTo(W - padR, H - padB);
+  ctx.stroke();
+
+  // filled area under the curve, then the curve line on top
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), H - padB);
+  for (let k = 0; k < n; k++) ctx.lineTo(xOf(k), yOf(losses[k]));
+  ctx.lineTo(xOf(n - 1), H - padB);
+  ctx.closePath();
+  ctx.fillStyle = opts.fill || "rgba(109,40,217,0.12)";
+  ctx.fill();
+  ctx.beginPath();
+  for (let k = 0; k < n; k++) (k ? ctx.lineTo : ctx.moveTo).call(ctx, xOf(k), yOf(losses[k]));
+  ctx.strokeStyle = curveColor; ctx.lineWidth = 1.5; ctx.stroke();
+
+  // current-snapshot marker: a vertical guide + a filled dot at (i, loss[i])
+  const mx = xOf(i), my = yOf(losses[i]);
+  ctx.strokeStyle = "rgba(22,163,74,0.35)";
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(mx, padT); ctx.lineTo(mx, H - padB); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = markColor;
+  ctx.beginPath(); ctx.arc(mx, my, 3.2, 0, 2 * Math.PI); ctx.fill();
+
+  // render facts for the panel + tests
+  let sum = 0;
+  for (let k = 0; k < n; k++) sum += losses[k];
+  canvas.dataset.lossCount = String(n);
+  canvas.dataset.currentStep = String(steps[i]);
+  canvas.dataset.currentLoss = String(losses[i]);
+  canvas.dataset.curveSum = sum.toFixed(4);
+  canvas.dataset.lossMin = lo.toFixed(6);
+  canvas.dataset.lossMax = hi.toFixed(6);
 }

@@ -6,7 +6,7 @@
 //
 // The model is ONE conditional DDPM trained on all Datasaurus shapes; meta.json
 // lists the shapes and per-shape data is lazy-loaded when the selector changes.
-import { renderScatter, renderForwardFrame, renderEndpoints, renderDensityCurve } from "./plot.js";
+import { renderScatter, renderForwardFrame, renderEndpoints, renderDensityCurve, renderLossCurve } from "./plot.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -144,18 +144,26 @@ function initForward(view, alphasBar) {
 // --- Training viewer: step through the snapshots of the selected shape -------
 function initTraining(view) {
   const slider = $("snapshot-slider");
-  let training = { snapshots: [[]], steps: [0] };
+  let training = { snapshots: [[]], steps: [0], losses: [0] };
   let gt = [];
+  // The generated samples' clipped outliers pile up on the right boundary, so the
+  // cloud reads as leaning right against the loss panel; nudge it slightly left
+  // (data-coord center offset) to re-balance it within the canvas.
+  const SNAPSHOT_SHIFT = 0.3;
 
   function renderAt(i) {
     renderScatter($("snapshots-canvas"), training.snapshots[i], {
       shape: `step ${training.steps[i]}`,
       view,
+      center: [SNAPSHOT_SHIFT, 0], // shift the generated cloud (and its ghost) left
       color: "#16a34a", // generated samples: green, matching reverse sampling
       ghost: gt, // faint ground-truth overlay behind the generated samples
       ghostColor: "#6d28d9", // gt overlay: faint purple
       ghostAlpha: 0.22,
     });
+    // global training-loss convergence curve, marked at the SAME snapshot index
+    // so the loss panel scrubs in lock-step with the samples panel
+    renderLossCurve($("train-loss"), training.losses, training.steps, i);
     $("train-step").textContent = String(training.steps[i]);
   }
   slider.addEventListener("input", () => renderAt(parseInt(slider.value, 10) || 0));

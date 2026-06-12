@@ -1,6 +1,7 @@
-// The Training panel is a 1×2 figure: the FIRST canvas shows the ground-truth
+// The Training panel is a 1×3 figure: the FIRST canvas shows the ground-truth
 // clean x0 (the target the model learns to reproduce) and stays static as the
-// snapshot slider moves; the SECOND is the generated-sample snapshots canvas.
+// snapshot slider moves; the SECOND is the generated-sample snapshots canvas;
+// the THIRD is the training-loss convergence curve.
 const { test, expect } = require('@playwright/test');
 
 async function ready(page) {
@@ -9,14 +10,14 @@ async function ready(page) {
   await expect(page.locator('body')).toHaveAttribute('data-app-state', 'ready');
 }
 
-test('training panel is a 1×2 [ground truth | snapshots] figure', async ({ page }) => {
+test('training panel is a 1×3 [ground truth | snapshots | loss] figure', async ({ page }) => {
   await ready(page);
 
-  // two canvases in a two-panel, ground truth first then snapshots
+  // three canvases in the figure: ground truth, snapshots, then the loss curve
   const ids = await page.evaluate(() =>
     [...document.querySelectorAll('#train-panel .two-panel canvas')].map((c) => c.id)
   );
-  expect(ids).toEqual(['train-groundtruth', 'snapshots-canvas']);
+  expect(ids).toEqual(['train-groundtruth', 'snapshots-canvas', 'train-loss']);
 
   // the ground-truth canvas renders the full clean dataset (200 points)
   const gt = page.locator('#train-groundtruth');

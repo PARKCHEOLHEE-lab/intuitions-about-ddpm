@@ -398,10 +398,13 @@ def test_committed_modes_records_every_timestep():
     assert diffs == {1}, f"modes is not per-timestep (record_every>1): diffs {diffs}"
 
 
-def test_committed_untrained_snapshot_is_bounded():
-    # KR2: clip_denoised must keep even the untrained (step-0) reverse sample
-    # within the data range. Without clipping a random model diverges to ~±40,
-    # which dominated the shared view and shrank the trained dino to a blob.
+def test_committed_early_reverse_snapshot_is_bounded():
+    # clip_denoised must keep the model's reverse output within the data range
+    # even when barely trained. Without clipping a near-random model diverges to
+    # ~±40, dominating the shared view and shrinking the dino to a blob.
+    # snapshots[0] is now the x_T ~ N(0,I) PRIOR (Gaussian tails by design, a few
+    # points past the view), so the clip guarantee is probed on the first
+    # GENERATED frame, snapshots[1] (step 200).
     import numpy as np
 
     training_p = os.path.join(PRECOMPUTED_DIR, "training_dino.json")
@@ -411,10 +414,10 @@ def test_committed_untrained_snapshot_is_bounded():
     with open(training_p) as f:
         training = json.load(f)
 
-    assert training["steps"][0] == 0  # first snapshot is the untrained model
-    snap0 = np.asarray(training["snapshots"][0], dtype=float)
-    m = float(np.abs(snap0).max())
-    assert m <= 3.5, f"untrained snapshot max|coord|={m:.2f} > 3.5 (clip_denoised not applied)"
+    assert training["steps"][0] == 0  # step 0 is the x_T prior; step 1 is generated
+    snap1 = np.asarray(training["snapshots"][1], dtype=float)  # first reverse output
+    m = float(np.abs(snap1).max())
+    assert m <= 3.5, f"early reverse snapshot max|coord|={m:.2f} > 3.5 (clip_denoised not applied)"
 
 
 def test_committed_modes_trajectories():
@@ -564,3 +567,123 @@ def test_export_all_shapes_tiny(tmp_path):
 
     # returned dict carries meta
     assert "meta" in result
+
+
+def test_export_records_per_checkpoint_losses(tmp_path):
+    # KR1: the export records the GLOBAL training loss at every snapshot
+    # checkpoint and serializes it as `losses`, index-aligned to `steps`.
+    # The untrained model's loss (step 0) must be higher than the final
+    # checkpoint's (training reduces the denoising MSE), so a constant /
+    # identity / zeroed loss recorder fails the descent assertion. Because ONE
+    # conditional model is trained over all shapes, the loss series is global —
+    # identical in every per-shape file.
+    import math
+
+    shapes = ["dino", "circle"]
+    cfg = {
+        "csv_path": CSV_PATH,
+        "device": "cpu",
+        "shapes": shapes,
+        "num_timesteps": 10,
+        "beta_start": 0.0001,
+        "beta_end": 0.02,
+        "beta_schedule_type": "cosine",
+        "epoch": 12,
+        "batch_size": 64,
+        "learning_rate": 5e-3,
+        "num_points": 64,
+        "jitter_scale": 1.0,
+        "label_embedding_dim": 8,
+        "coordinate_embedding_dim": 16,
+        "coordinate_encoder_type": "sinusoidal",
+        "coordinate_encoder_scale": 25.0,
+        "time_embedding_dim": 16,
+        "time_encoder_type": "sinusoidal",
+        "num_denoiser_hidden_layers": 2,
+        "denoiser_hidden_dim": 32,
+        "denoiser_output_dim": 2,
+        "denoiser_activation": "GELU",
+        "snapshot_coarse_every": 5,  # several checkpoints -> a real little curve
+        "reverse_record_every": 5,
+        "seed": 0,
+    }
+
+    export_viz.export_all_shapes(str(tmp_path), cfg)
+
+    for shape in shapes:
+        training = json.loads((tmp_path / f"training_{shape}.json").read_text())
+        steps = training["steps"]
+        losses = training["losses"]
+        assert len(losses) == len(steps), (
+            f"{shape}: losses ({len(losses)}) not aligned to steps ({len(steps)})"
+        )
+        assert all(isinstance(v, (int, float)) and math.isfinite(v) for v in losses), (
+            f"{shape}: losses contain non-finite values: {losses}"
+        )
+        # every checkpoint's loss is a real positive denoising MSE (not a zeroed /
+        # placeholder series) — catches a recorder that fills interior entries with 0
+        assert all(v > 0 for v in losses), f"{shape}: non-positive loss recorded: {losses}"
+        assert losses[0] > losses[-1], (
+            f"{shape}: training loss did not decrease ({losses[0]} -> {losses[-1]})"
+        )
+
+    # global series: one model -> identical loss curve in every per-shape file
+    a = json.loads((tmp_path / "training_dino.json").read_text())["losses"]
+    b = json.loads((tmp_path / "training_circle.json").read_text())["losses"]
+    assert a == b, "global training loss must be identical across shapes (one model)"
+
+
+def test_export_step0_snapshot_is_noise_prior(tmp_path):
+    # KR4: the untrained (step-0) training snapshot is shown as the x_T ~ N(0,I)
+    # noise prior the sampler STARTS from — a single shared cloud across shapes —
+    # not each shape's clipped untrained reverse output (which fills the data box
+    # and reads as a confusing square). So step-0 is IDENTICAL across shapes and
+    # is Gaussian (~unit std), unlike the per-shape box-clipped output.
+    import numpy as np
+
+    shapes = ["dino", "circle"]
+    cfg = {
+        "csv_path": CSV_PATH,
+        "device": "cpu",
+        "shapes": shapes,
+        "num_timesteps": 10,
+        "beta_start": 0.0001,
+        "beta_end": 0.02,
+        "beta_schedule_type": "cosine",
+        "epoch": 2,
+        "batch_size": 64,
+        "learning_rate": 1e-3,
+        "num_points": 64,
+        "jitter_scale": 1.0,
+        "label_embedding_dim": 8,
+        "coordinate_embedding_dim": 16,
+        "coordinate_encoder_type": "sinusoidal",
+        "coordinate_encoder_scale": 25.0,
+        "time_embedding_dim": 16,
+        "time_encoder_type": "sinusoidal",
+        "num_denoiser_hidden_layers": 2,
+        "denoiser_hidden_dim": 32,
+        "denoiser_output_dim": 2,
+        "denoiser_activation": "GELU",
+        "snapshot_coarse_every": 10_000,  # snapshots at [0, total] -> step 0 exists
+        "reverse_record_every": 5,
+        "seed": 0,
+    }
+
+    export_viz.export_all_shapes(str(tmp_path), cfg)
+
+    dino = json.loads((tmp_path / "training_dino.json").read_text())
+    circle = json.loads((tmp_path / "training_circle.json").read_text())
+    assert dino["steps"][0] == 0
+    s0 = dino["snapshots"][0]
+
+    # shared prior: identical step-0 across shapes (per-shape untrained reverse
+    # outputs would DIFFER, since each shape conditions on a different label)
+    assert s0 == circle["snapshots"][0], "step-0 is not a shared noise prior"
+
+    arr = np.asarray(s0, dtype=float)
+    assert arr.shape == (NUM_POINTS_VIZ, 2)
+    # Gaussian N(0,I): ~zero mean, ~unit std. The old clipped-box output has a
+    # much larger spread (std ~ clip/sqrt(3) ~ 1.6), so this bound rejects it.
+    assert abs(float(arr.mean())) < 0.25, f"step-0 mean {arr.mean():.3f} not ~0"
+    assert 0.7 < float(arr.std()) < 1.35, f"step-0 std {arr.std():.3f} not ~1 (Gaussian)"
