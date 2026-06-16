@@ -53,7 +53,20 @@ body {
   -webkit-text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding: 1.5em clamp(1.5em, 20vw - 6em, 40vw - 17em);
+  padding: 1.5em;
+}
+
+/* Horizontal page gutters follow PARKCHEOLHEE-lab.github.io's responsive
+   breakpoints (its layout.sass): the column widens at tablet (>=40em) and
+   again at desktop (>=64em). Only the left/right gutters change here; the
+   1.5em vertical padding above is kept. The `em` in these calcs resolves
+   against the body font-size (the same fluid formula that site uses), so the
+   gutter widths match it pixel-for-pixel. */
+@media (min-width: 40em) and (max-width: 64em) {
+  body { padding-left: calc(20vw - 6em); padding-right: calc(20vw - 6em); }
+}
+@media (min-width: 64em) {
+  body { padding-left: calc(40vw - 17em); padding-right: calc(40vw - 17em); }
 }
 
 /* The site keeps backgrounds flat even in dark mode. */
