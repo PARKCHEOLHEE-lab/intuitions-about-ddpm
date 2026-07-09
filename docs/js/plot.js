@@ -483,3 +483,166 @@ export function renderLossCurve(canvas, losses, steps, index, opts = {}) {
   canvas.dataset.lossMin = lo.toFixed(6);
   canvas.dataset.lossMax = hi.toFixed(6);
 }
+
+// n draws from N(0,1), reproducibly. The page seeds its own PRNG rather than
+// calling Math.random() so the figure — and the tests that read it — get the
+// same histogram on every run.
+//
+// mulberry32: a 32-bit counter-based PRNG. Small, fast, and good enough for a
+// picture of a bell curve (it is not cryptographic).
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Box–Muller: two uniforms in, one standard normal out. The transform also
+// yields a second normal from sin(), but taking only cos() keeps the uniform
+// budget at exactly 2 per draw — which is what makes the sequence prefix-stable
+// (see standardNormalSamples).
+function randn(rand) {
+  let u = 0, v = 0;
+  while (u === 0) u = rand(); // log(0) is -Infinity; redraw the (measure-zero) zero
+  while (v === 0) v = rand();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// Draw n standard normals from `seed`. The sequence is PREFIX-STABLE: a longer
+// run extends a shorter one, because the generator is restarted from the same
+// seed and each draw consumes a fixed two uniforms. So growing n on the MSE
+// page's slider APPENDS draws to the histogram instead of resampling it.
+export function standardNormalSamples(n, seed) {
+  const rand = mulberry32(seed);
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = randn(rand);
+  return out;
+}
+
+const HIST_VIEW = 4; // draw ε over [-4, 4]; N(0,1) puts ~6e-5 of its mass outside
+const HIST_BINS = 160;
+const HIST_YMAX = 0.52; // headroom above the N(0,1) peak (≈0.399)
+const RUG_MAX = 400; // rug ticks drawn; more than this and the baseline is a smear
+const HIST_INK = "#6d28d9"; // same accent the forward panel's density curve uses
+const HIST_FILL = "rgba(109,40,217,0.18)";
+
+// The standard normal density N(x; 0, 1).
+function normalPdf(x) {
+  return Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
+}
+
+// Bin `samples` into DENSITY units — each bin holds count / (n · binWidth), so
+// the bars integrate to 1 and live on the same vertical scale as normalPdf.
+// With no draws yet the bins are zero (not 0/0), because N = 0 is a real state:
+// the play animation starts there.
+export function densityHistogram(samples, bins, view) {
+  const binWidth = (2 * view) / bins;
+  const counts = new Array(bins).fill(0);
+  for (let i = 0; i < samples.length; i++) {
+    const s = samples[i];
+    if (s >= -view && s < view) counts[Math.floor((s + view) / binWidth)]++;
+  }
+  if (samples.length === 0) return counts;
+  return counts.map((c) => c / (samples.length * binWidth));
+}
+
+// The MSE page's figure: the empirical distribution of N draws from N(0,1),
+// against the density itself. Both are in density units, which is the whole
+// point — the reader watches the bars settle ONTO the curve as N grows, so the
+// average over draws reproduces the density weighting with no explicit weight.
+//
+// Exposes data-baseline so tests can tell the rug (below it) from the bars and
+// the ghost (above it); the density claim itself is tested on densityHistogram.
+export function renderSampleHistogram(canvas, samples) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  const padX = 16, padTop = 14, padBottom = 26;
+  const baseline = H - padBottom;
+  const view = HIST_VIEW;
+  const bins = HIST_BINS;
+  const binWidth = (2 * view) / bins;
+  const steps = 240;
+
+  const dens = densityHistogram(samples, bins, view);
+
+  // At tiny N a single draw can overshoot the N(0,1) peak (N=10 gives 2.0), so
+  // grow the vertical scale to contain the tallest bar rather than clipping it.
+  let peak = 0, bars = 0;
+  for (let i = 0; i < bins; i++) {
+    if (dens[i] > 0) bars++;
+    if (dens[i] > peak) peak = dens[i];
+  }
+  const yMax = Math.max(HIST_YMAX, peak * 1.05);
+
+  const xOf = (v) => padX + ((v + view) / (2 * view)) * (W - 2 * padX);
+  const yOf = (v) => baseline - (v / yMax) * (baseline - padTop);
+
+  const traceCurve = () => {
+    for (let i = 0; i <= steps; i++) {
+      const x = -view + (2 * view * i) / steps;
+      ctx.lineTo(xOf(x), yOf(normalPdf(x)));
+    }
+  };
+
+  ctx.clearRect(0, 0, W, H);
+
+  // ghost underlay: the analytic density the draws are converging to
+  ctx.beginPath();
+  ctx.moveTo(xOf(-view), baseline);
+  traceCurve();
+  ctx.lineTo(xOf(view), baseline);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(120,120,120,0.08)";
+  ctx.fill();
+
+  // live bars: one rect per bin, each keeping its own edges, rather than a
+  // single unioned silhouette that hides the boundaries between adjacent bins
+  ctx.beginPath();
+  for (let i = 0; i < bins; i++) {
+    if (dens[i] <= 0) continue; // an empty bin is not a bar
+    const left = xOf(-view + i * binWidth);
+    const right = xOf(-view + (i + 1) * binWidth);
+    const y = yOf(dens[i]);
+    ctx.rect(left, y, right - left, baseline - y);
+  }
+  ctx.fillStyle = HIST_FILL;
+  ctx.fill();
+  ctx.strokeStyle = HIST_INK;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ghost outline, drawn ABOVE the bars: at large N the two shapes coincide, so
+  // a buried dashed line would vanish exactly where the reader wants to compare
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(xOf(-view), yOf(normalPdf(-view)));
+  traceCurve();
+  ctx.strokeStyle = "rgba(120,120,120,0.45)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // rug: the individual draws, subsampled so the baseline stays readable
+  const stride = Math.max(1, Math.ceil(samples.length / RUG_MAX));
+  let rug = 0;
+  ctx.strokeStyle = "rgba(109,40,217,0.55)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < samples.length; i += stride) {
+    const x = samples[i];
+    if (x < -view || x > view) continue;
+    ctx.moveTo(xOf(x), baseline + 4);
+    ctx.lineTo(xOf(x), baseline + 12);
+    rug++;
+  }
+  ctx.stroke();
+
+  canvas.dataset.sampleCount = String(samples.length);
+  canvas.dataset.barCount = String(bars);
+  canvas.dataset.rugCount = String(rug);
+  canvas.dataset.baseline = String(baseline);
+  canvas.dataset.yMax = yMax.toFixed(4);
+}
