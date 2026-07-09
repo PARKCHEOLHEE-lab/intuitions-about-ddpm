@@ -16,10 +16,10 @@
 
   <main>
     <section id="expectation-panel">
-      <h2>An average with no weights in it</h2>
-      <p>A diffusion model is trained on a single objective. Given a noised input $x_t$ and its timestep $t$, the network $\varepsilon_\theta$ predicts the noise that produced $x_t$, and the training signal is the squared error against the noise actually drawn:</p>
+      <h2>Where did the weights go?</h2>
+      <p>A diffusion model is trained on a single objective<a class="cite" href="#ref-1">[1]</a>. Given a noised input $x_t$ and its timestep $t$, the network $\varepsilon_\theta$ predicts the noise that produced $x_t$, and the training signal is the squared error against the noise actually drawn:</p>
       <p class="eq">$$\big\lVert\, \varepsilon - \varepsilon_\theta(x_t, t) \,\big\rVert^2$$</p>
-      <p>In practice this is evaluated one sample at a time and averaged over a minibatch, every term receiving the same factor $\tfrac{1}{N}$. But the quantity being minimized is an <strong>expectation</strong>, and an expectation is a <em>weighted</em> average. So where did the weights go?</p>
+      <p>In practice this is evaluated one sample at a time and averaged over a minibatch, every term receiving the same factor $\tfrac{1}{N}$. But the quantity being minimized is an <strong>expectation</strong>, and an expectation is a <em>weighted</em> average. The weights have to be somewhere.</p>
 
       <p>The discrepancy is only apparent. Let $f$ be a function of a random variable $\varepsilon$. What a training loop actually computes stands in this relation to the quantity it estimates:</p>
       <p class="eq">$$\mathbb{E}_{\varepsilon}\big[f(\varepsilon)\big] \;\approx\; \frac{1}{N}\sum_{n=1}^{N} f(\varepsilon_n), \qquad \varepsilon_n \sim \mathcal{N}(0,1)$$</p>
@@ -29,11 +29,11 @@
       <p class="eq">$$0.8\,A + 0.2\,B$$</p>
       <p>In the second, each value is <em>repeated</em> in proportion to its weight, and the result is averaged uniformly:</p>
       <p class="eq">$$\frac{A+A+A+A+A+A+A+A+B+B}{10} \;=\; \frac{8A + 2B}{10} \;=\; 0.8\,A + 0.2\,B$$</p>
-      <p>The two agree. In the second construction every term carries the identical factor $\tfrac{1}{10}$, yet the result is weighted — because $A$ occurs eight times and $B$ twice. The weighting is produced by <strong>multiplicity</strong> rather than by coefficients.</p>
+      <p>Both give the same number. In the second construction every term carries the identical factor $\tfrac{1}{10}$, yet the result is weighted — because $A$ occurs eight times and $B$ twice. The weighting is produced by <strong>multiplicity</strong> rather than by coefficients.</p>
 
-      <p>Estimating an expectation by a sample mean is an instance of that second construction. For $\varepsilon\sim\mathcal{N}(0,1)$ the expectation weights each value by its density:</p>
+      <p>Estimating an expectation by a sample mean is an instance of that second construction — the <em>Monte Carlo</em> estimate. For $\varepsilon\sim\mathcal{N}(0,1)$ the expectation weights each value by its density:</p>
       <p class="eq">$$\mathbb{E}_{\varepsilon\sim\mathcal{N}(0,1)}\big[f(\varepsilon)\big] \;=\; \int \mathcal{N}(\varepsilon;0,1)\, f(\varepsilon)\, d\varepsilon$$</p>
-      <p>The integral ranges over infinitely many values of $\varepsilon$ and cannot be evaluated term by term. Drawing a finite sample and averaging replaces the weight that would have multiplied a value with the frequency at which that value is drawn. Values near $0$ come up constantly; values near $5$ almost never. The density decides how often each region contributes, so the weighting is realized by the sampling itself.</p>
+      <p>The integral ranges over infinitely many values of $\varepsilon$ and cannot be evaluated term by term. Drawing a finite sample and averaging replaces the weight that would have multiplied a value with the frequency at which that value is drawn. Values near $0$ come up constantly; values near $5$ almost never. The density decides how often each region contributes, so the weighting is realized by the sampling itself. You can watch that happen in the figure below.</p>
 
       <div class="module">
         <div class="viz">
@@ -58,9 +58,16 @@
       <p>The training objective is an instance of the same construction. The squared error is defined for <em>one</em> data point $x_0$, <em>one</em> timestep $t$, and <em>one</em> noise vector $\varepsilon$. But the model must denoise well not for a single triple — it must do so in expectation over all of them:</p>
       <p class="eq">$$\mathcal{L}_{\text{simple}} = \mathbb{E}_{x_0,\,t,\,\varepsilon}\Big[\,\big\lVert\, \varepsilon - \varepsilon_\theta(x_t, t) \,\big\rVert^2\,\Big]$$</p>
       <p>Each training step draws $x_0$ from the data, $t$ uniformly from $\{1,\dots,T\}$, and $\varepsilon$ from $\mathcal{N}(0, I)$, then takes a gradient step on the squared error at that one triple. Averaging it over a minibatch is precisely the Monte Carlo estimate of the expectation above. The procedure <em>looks</em> like ordinary mean-squared-error minimization because the weights never appear as coefficients — they are supplied by the three distributions the triple is drawn from.</p>
-      <p>So the loss is both a mean squared error and an expectation, and the two descriptions are consistent. A sample mean does not throw away the weights of the expectation it estimates; it represents them in the sampling distribution.</p>
+      <p>So the loss is both a mean-squared error and an expectation, and the two descriptions are consistent. A sample mean does not throw away the weights of the expectation it estimates; it represents them in the sampling distribution.</p>
 
-      <p>One caveat, since this page hangs off that loss. The objective above is $\mathcal{L}_{\text{simple}}$: it <strong>drops</strong> the coefficient $\lambda_t$ that the true variational bound — the evidence lower bound, or <strong>ELBO</strong> — places in front of each timestep's squared error, weighting every $t$ equally instead. Ho et al. dropped it on purpose, and report better samples for it; it is not something the sampling restores. Everything argued above concerns the weights <em>inside</em> $\mathbb{E}_{x_0,t,\varepsilon}$, and $\lambda_t$ sat outside that expectation.</p>
+      <p>One weight, though, is missing from that account. The objective above is $\mathcal{L}_{\text{simple}}$: it drops the coefficient $\lambda_t$ that the true variational bound — the <strong>evidence lower bound</strong>, or ELBO — places in front of each timestep's squared error, weighting every $t$ equally instead. Ho et al. dropped it deliberately and report better samples for it<a class="cite" href="#ref-1">[1]</a>; it is not something the sampling restores. Everything above concerns the weights <em>inside</em> $\mathbb{E}_{x_0,t,\varepsilon}$, and $\lambda_t$ sat outside that expectation.</p>
+    </section>
+
+    <section id="references-panel">
+      <h2>References</h2>
+      <ol class="references">
+        <li id="ref-1">Jonathan Ho, Ajay Jain, and Pieter Abbeel. Denoising diffusion probabilistic models. In <em>Advances in Neural Information Processing Systems</em>, volume 33, pages 6840–6851, 2020.</li>
+      </ol>
     </section>
   </main>
 
