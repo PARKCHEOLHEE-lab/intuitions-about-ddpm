@@ -50,9 +50,7 @@ single `meta.json`) and `export_modes_figure()` (`modes.json`).
 the training section of `index.html`. It answers a question the main page raises
 and never settles: the loss is written as an expectation $\mathbb{E}[\cdot]$, a
 *weighted* average, but training averages a minibatch uniformly. Where did the
-weights go? (In the sampling: a weight becomes the frequency of a draw.) It also
-records the one weight that is genuinely dropped — the ELBO's per-timestep
-$\lambda_t$, which `L_simple` discards on purpose.
+weights go? (In the sampling: a weight becomes the frequency of a draw.)
 
 It is a plain sibling file, not a route: the Pages workflow publishes all of
 `docs/`, so `/mse.html` is served with no extra configuration. It shares

@@ -56,11 +56,9 @@
     <section id="diffusion-loss-panel">
       <h2>Back to the diffusion loss</h2>
       <p>The training objective is an instance of the same construction. The squared error is defined for <em>one</em> data point $x_0$, <em>one</em> timestep $t$, and <em>one</em> noise vector $\varepsilon$. But the model must denoise well not for a single triple — it must do so in expectation over all of them:</p>
-      <p class="eq">$$\mathcal{L}_{\text{simple}} = \mathbb{E}_{x_0,\,t,\,\varepsilon}\Big[\,\big\lVert\, \varepsilon - \varepsilon_\theta(x_t, t) \,\big\rVert^2\,\Big]$$</p>
+      <p class="eq">$$\mathcal{L} = \mathbb{E}_{x_0,\,t,\,\varepsilon}\Big[\,\big\lVert\, \varepsilon - \varepsilon_\theta(x_t, t) \,\big\rVert^2\,\Big]$$</p>
       <p>Each training step draws $x_0$ from the data, $t$ uniformly from $\{1,\dots,T\}$, and $\varepsilon$ from $\mathcal{N}(0, I)$, then takes a gradient step on the squared error at that one triple. Averaging it over a minibatch is precisely the Monte Carlo estimate of the expectation above. The procedure <em>looks</em> like ordinary mean-squared-error minimization because the weights never appear as coefficients — they are supplied by the three distributions the triple is drawn from.</p>
       <p>So the loss is both a mean-squared error and an expectation, and the two descriptions are consistent. A sample mean does not throw away the weights of the expectation it estimates; it represents them in the sampling distribution.</p>
-
-      <p>One weight, though, is missing from that account. The objective above is $\mathcal{L}_{\text{simple}}$: it drops the coefficient $\lambda_t$ that the true variational bound — the <strong>evidence lower bound</strong>, or ELBO — places in front of each timestep's squared error, weighting every $t$ equally instead. Ho et al. dropped it deliberately and report better samples for it<a class="cite" href="#ref-1">[1]</a>; it is not something the sampling restores. Everything above concerns the weights <em>inside</em> $\mathbb{E}_{x_0,t,\varepsilon}$, and $\lambda_t$ sat outside that expectation.</p>
     </section>
 
     <section id="references-panel">
