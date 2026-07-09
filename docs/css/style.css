@@ -188,6 +188,12 @@ p.controls { margin-top: 1.6em; flex-wrap: nowrap; }
    merged into one paper-style caption below the row (the panel's p.hint). */
 .two-panel figure { margin: 0; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; position: relative; }
 
+/* mse.html's lone figure is not in a .two-panel row, so it would otherwise keep
+   the UA's default `figure { margin: 1em 40px }` and sit inset from the shared
+   page column — 80px of a ~350px mobile column. Zero the sides, keep the
+   vertical rhythm the row's siblings get from .viz. */
+#expectation-panel figure { margin: 0 0 0.4em; }
+
 /* In-canvas legend overlaid on the plot's top-left (matplotlib-style): a colored
    × per series + label, on a faint backdrop so it reads over the scatter. */
 .canvas-legend {

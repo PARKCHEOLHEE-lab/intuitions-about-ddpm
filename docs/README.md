@@ -30,10 +30,42 @@ single `meta.json`) and `export_modes_figure()` (`modes.json`).
     with endpoint clouds + per-trajectory coloring.
   - `forward_<shape>.json` / `training_<shape>.json` / `reverse_<shape>.json` —
     one set per Datasaurus shape (lazy-loaded when the shape selector changes).
-- **`docs/js/app.js`** — bootstrap viewer (fetch + wire sliders/play/toggles).
+- **`docs/js/app.js`** — bootstrap viewer for `index.html` (fetch + wire
+  sliders/play/toggles). Runs `boot()` at import time.
+- **`docs/js/controls.js`** — the shared figure transport (`trackFill`,
+  `attachPlay`): a play/pause button driving a range slider. Kept out of
+  `app.js` so a second page can wire a play button without dragging the index
+  bootstrap along with it.
 - **`docs/js/plot.js`** — shared canvas renderers (`renderScatter`,
-  `renderForwardFrame`, `renderEndpoints`, `renderDensityCurve`).
+  `renderForwardFrame`, `renderEndpoints`, `renderDensityCurve`,
+  `renderLossCurve`, `renderSampleHistogram`) plus the pure helpers they build
+  on (`chaikinSmooth`, `diffusedMarginal1d`, `densityHistogram`,
+  `standardNormalSamples`).
+- **`docs/js/mse.js`** — bootstrap for `mse.html` (below).
 - **`docs/js/math.js`** — renders the inline/display math via vendored KaTeX.
+
+## The second page: `mse.html`
+
+`docs/mse.html` — *The Expectation Behind the MSE* — hangs off the word "MSE" in
+the training section of `index.html`. It answers a question the main page raises
+and never settles: the loss is written as an expectation $\mathbb{E}[\cdot]$, a
+*weighted* average, but training averages a minibatch uniformly. Where did the
+weights go? (In the sampling: a weight becomes the frequency of a draw.) It also
+records the one weight that is genuinely dropped — the ELBO's per-timestep
+$\lambda_t$, which `L_simple` discards on purpose.
+
+It is a plain sibling file, not a route: the Pages workflow publishes all of
+`docs/`, so `/mse.html` is served with no extra configuration. It shares
+`css/style.css`, the vendored KaTeX, `js/math.js`, and the transport in
+`js/controls.js` with the index page.
+
+**One architectural exception.** Its figure is the only thing in `docs/` that
+computes rather than replays: it draws N samples from $\mathcal{N}(0,1)$ in the
+browser (`standardNormalSamples`) instead of loading precomputed JSON. Sampling
+*is* the subject of the page, there is no model output to precompute, and 50,000
+draws would be an absurd thing to ship as a JSON file. The draws are **seeded**
+(mulberry32 + Box–Muller), so the figure is deterministic: every reload and
+every CI run paints the same histogram.
 
 One **conditional** model is trained over **all** Datasaurus shapes, so the
 shape selector near the top switches every panel between shapes (the page loads
@@ -59,6 +91,8 @@ Top to bottom:
 6. **Reverse sampling** — three canvases: generated `x0`, the reverse
    trajectories (noise → data), and the marginal `q(x_t)` gathering back into the
    multimodal data.
+
+The word "MSE" in section 5 links out to `mse.html`.
 
 ## Model / schedule
 
